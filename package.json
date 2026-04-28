@@ -1,0 +1,75 @@
+{
+  "name": "talos",
+  "version": "0.1.0",
+  "description": "Vertical ETH agent — daemon + thin clients",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Allen Saji",
+  "homepage": "https://github.com/Allen-Saji/talos",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Allen-Saji/talos.git"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "bin": {
+    "talos": "./dist/bin/talos.js",
+    "talosd": "./dist/bin/talosd.js"
+  },
+  "files": [
+    "dist",
+    "drizzle"
+  ],
+  "scripts": {
+    "dev:cli": "tsx bin/talos.ts",
+    "dev:daemon": "tsx bin/talosd.ts",
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "migrate:gen": "drizzle-kit generate",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint && pnpm typecheck",
+    "commit-msg": "npx --no-install commitlint --edit \"$1\""
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "latest",
+    "@ai-sdk/openai": "latest",
+    "@electric-sql/pglite": "latest",
+    "ai": "latest",
+    "commander": "latest",
+    "dotenv": "latest",
+    "drizzle-orm": "latest",
+    "grammy": "latest",
+    "pino": "latest",
+    "pino-pretty": "latest",
+    "viem": "latest",
+    "ws": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "latest",
+    "@commitlint/cli": "latest",
+    "@commitlint/config-conventional": "latest",
+    "@types/node": "latest",
+    "@types/ws": "latest",
+    "drizzle-kit": "latest",
+    "simple-git-hooks": "latest",
+    "tsup": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
