@@ -1,0 +1,29 @@
+node_modules/
+dist/
+coverage/
+
+# Talos local data
+.talos/
+*.db
+*.db-journal
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.zed/
