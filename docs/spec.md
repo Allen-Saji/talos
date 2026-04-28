@@ -97,9 +97,20 @@ Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hoste
 - **F8.3** P0 Architecture diagram (BBG-style via diagram-kit)
 - **F8.4** P0 Submission writeup for KeeperHub track
 
+## 9. Embeddability (Talos-as-MCP)
+
+- **F9.1** P0 `talos serve --mcp` exposes Talos as an MCP server over stdio
+- **F9.2** P0 Tool: `query_eth_knowledge` — hits local PGLite vector DB, returns top-N chunks + cited sources
+- **F9.3** P0 Tool: `eth_action` — runs full agent loop, returns KeeperHub workflow URL + tx hash
+- **F9.4** P0 Tool: `eth_status` — wallet, chains, last-sync, enabled MCPs
+- **F9.5** P1 HTTP/SSE transport in addition to stdio (for remote hosts)
+- **F9.6** P1 Pass-through namespace: re-export curated DeFi MCPs under `talos.*` so importers get the bundle from one connector
+- **F9.7** P1 README section: drop-in configs for OpenClaw, Hermes, Claude Desktop, Cursor
+- **F9.8** P2 Auth token gate so multiple hosts can share one Talos instance safely
+
 ## Counts
 
-60 features. P0 = 32. P1 = 22. P2 = 6.
+68 features. P0 = 36. P1 = 25. P2 = 7.
 
 ## Open questions (deferred)
 
