@@ -1,7 +1,7 @@
 ---
 tags: [project, talos, hackathon, eth-open-agents, spec]
 created: 2026-04-27
-modified: 2026-04-28
+modified: 2026-04-29
 status: locked
 ---
 
@@ -73,7 +73,7 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 - **F5.8** P2 Voice interface via dTelecom provider (x402 micropayments)
 - **F5.9** P0 First-class `Agent` type + AgentRegistry (multi-agent ready, single agent v1)
 - **F5.10** P0 Vercel AI SDK (`ai` package) as agent loop substrate
-- **F5.11** P0 Tag-based KeeperHub middleware: tools self-declare `mutates: true`
+- **F5.11** P0 Audit-by-default KeeperHub middleware: undeclared tools route through workflows; regex `KNOWN_READONLY` allowlist bypasses known read-only patterns
 
 ## 6. Onboarding (the wedge)
 
@@ -86,6 +86,7 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 - **F6.7** P1 ZeroDev project ID auto-prompt with link to free tier signup
 - **F6.8** P1 `talos status` command shows current capabilities, last cron run, balances
 - **F6.9** P1 `talos doctor` command diagnoses misconfigs
+- **F6.10** P0 `init` is idempotent: detects existing config, prompts keep / reset / partial-reset (re-do OAuth only)
 
 ## 7. Distribution
 
@@ -104,7 +105,9 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 
 ## 9. Embeddability (Talos-as-MCP)
 
-- **F9.1** P0 `talos serve --mcp` exposes Talos as an MCP server over stdio
+(Implemented as the `mcp-server` channel adapter under Section 11.)
+
+- **F9.1** P0 `talos serve --mcp` proxies host stdio MCP ↔ daemon WS (auto-starts daemon)
 - **F9.2** P0 Tool: `query_eth_knowledge` — hits local PGLite vector DB, returns top-N chunks + cited sources
 - **F9.3** P0 Tool: `eth_action` — runs full agent loop, returns KeeperHub workflow URL + tx hash
 - **F9.4** P0 Tool: `eth_status` — wallet, chains, last-sync, enabled MCPs
@@ -119,7 +122,7 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 
 Detail in [[architecture]] §Persistence + §Memory.
 
-- **F10.1** P0 PGLite single-store at `~/.config/talos/talos.db` (knowledge + conversations in one DB)
+- **F10.1** P0 PGLite single-store at `~/.config/talos/talos.db` (knowledge + conversations); daemon owns at runtime, one-shot commands open directly only when daemon is stopped
 - **F10.2** P0 Drizzle ORM with auto-generated SQL migrations
 - **F10.3** P0 Schema: `threads`, `runs`, `steps`, `tool_calls`, `message_embeddings`, `knowledge_chunks`
 - **F10.4** P0 Hybrid retrieval: pgvector HNSW (semantic) + tsvector GIN (keyword)
@@ -132,9 +135,67 @@ Detail in [[architecture]] §Persistence + §Memory.
 - **F10.11** P1 `talos thread <id>` to load and continue past threads
 - **F10.12** P2 In-memory LRU cache for query embeddings (1000 entries)
 
+## 11. Daemon & Channels (always-running, OpenClaw-pattern)
+
+Detail in [[architecture]] §Daemon and channels.
+
+- **F11.1** P0 `talosd` long-running daemon — holds runtime, hot MCP servers, PGLite, knowledge cron
+- **F11.2** P0 WebSocket control plane on `127.0.0.1:7711`; bearer-token auth via `~/.config/talos/daemon.token` (0600)
+- **F11.3** P0 In-process channel adapter contract; channels loaded at boot from `channels.yaml`
+- **F11.4** P0 Lifecycle: `talos start | stop | restart | status | logs [-f]`
+- **F11.5** P0 `talos install-service` — installs as launchd (macOS) / systemd user service (Linux)
+- **F11.6** P0 Auto-start: `talos chat` and `talos serve --mcp` start daemon if not running
+- **F11.7** P0 Concurrent runs across channels; each has its own `AbortController` and thread context
+- **F11.8** P0 Thread keying: CLI `cli:{$USER}:default` persistent, TG `tg:{chatId}` persistent, MCP `mcp:{pid}:{startedAt}` per host session; cross-thread recall bridges across all
+- **F11.9** P0 CLI channel: `talos chat` thin WS client REPL; ^C aborts run, ^D exits; slash commands client-side
+- **F11.10** P0 MCP-server channel: `talos serve --mcp` proxies host stdio ↔ daemon WS (replaces standalone mode)
+- **F11.11** P0 Telegram channel: long-poll Bot API via grammY; per-chat threads
+- **F11.12** P0 Telegram streaming UX: edit-in-place (one message per run, progressive updates, ~1s throttle)
+- **F11.13** P0 Single-user model: one wallet shared across channels; Telegram username/userId whitelist
+- **F11.14** P0 `talos channels list | add | remove | enable | disable`
+- **F11.15** P0 `channels.yaml` config schema; bot tokens via env-ref, never inline
+- **F11.16** P1 Daemon log file with rotation at `~/.config/talos/daemon.log`
+- **F11.17** P1 Daemon config hot-reload (SIGHUP rereads `channels.yaml` without restart)
+- **F11.18** P1 OS service template generator (`talos install-service --print` for inspection)
+- **F11.19** P2 Discord channel adapter
+- **F11.20** P2 Web dashboard channel: tiny SPA at `127.0.0.1:7711/ui`
+
+## 12. Tests
+
+Stack: Vitest + PGLite-in-memory + seeded LLM eval. Demo-flow eval is the regression gate.
+
+### P0 — required for v1
+
+- **F12.1** P0 Provider router resolves model id → SDK adapter (unit)
+- **F12.2** P0 KeeperHub middleware: `mutates: true` → routes through workflow (unit)
+- **F12.3** P0 KeeperHub middleware: undeclared annotation → defaults to mutating (unit)
+- **F12.4** P0 KeeperHub middleware: name matches `KNOWN_READONLY` allowlist → bypasses (unit)
+- **F12.5** P0 Tool-result flattening: single text → string (unit)
+- **F12.6** P0 Tool-result flattening: text-with-JSON → parsed object (unit)
+- **F12.7** P0 Cross-thread recall: cosine ≥ 0.78 threshold gate enforces (unit)
+- **F12.8** P0 Thread auto-summarization triggers at exactly 20 runs (unit)
+- **F12.9** P0 Migrations: empty DB → schema at vN (integration)
+- **F12.10** P0 Migrations: vN-1 → vN, no data loss (integration)
+- **F12.11** P0 WS auth: bad bearer token → 401 (integration)
+- **F12.12** P0 WS auth: valid token → connect + can run (integration)
+- **F12.13** P0 Run abort: AbortController cancels `streamText`, persists `runs.error: 'aborted'` (integration)
+- **F12.14** P0 Telegram whitelist: non-allowed user silently dropped (unit)
+- **F12.15** P0 `init` idempotency: re-running with existing config prompts keep/reset/partial (unit)
+- **F12.16** P0 **CRITICAL** Demo-flow eval: "supply 100 USDC to Aave on arbitrum" hits expected MCP sequence on locked seed (eval)
+
+### P1 — required for v1.1
+
+- **F12.17** P1 Tool-result flattening: multi-text blocks joined with `\n\n` (unit)
+- **F12.18** P1 Tool-result flattening: error → wrapped with `error` tag (unit)
+- **F12.19** P1 Concurrent runs across channels don't interfere (integration)
+- **F12.20** P1 MCP-server proxy: stdio in → WS out → events back, end-to-end (integration)
+- **F12.21** P1 Telegram edit-in-place: rate-limit throttle (~1.1s) holds (integration)
+- **F12.22** P1 Knowledge cron: one source 503, others succeed, partial state surfaced (integration)
+- **F12.23** P1 OAuth flow end-to-end against mocked KeeperHub (integration)
+
 ## Counts
 
-86 features. P0 = 55. P1 = 23. P2 = 8.
+130 features. P0 = 87. P1 = 33. P2 = 10.
 
 ## Open questions (deferred)
 
