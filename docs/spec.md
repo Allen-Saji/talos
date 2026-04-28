@@ -1,13 +1,15 @@
 ---
 tags: [project, talos, hackathon, eth-open-agents, spec]
 created: 2026-04-27
-modified: 2026-04-27
+modified: 2026-04-28
 status: locked
 ---
 
 # Talos — Spec
 
 Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hosted, BYOK model keys, OpenClaw-style. Spec locked 2026-04-27.
+
+Runtime design (frameworks, schemas, flows): see [[architecture]].
 
 ## Sponsor tracks
 
@@ -64,11 +66,14 @@ Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hoste
 - **F5.1** P0 BYOK model keys (Anthropic, OpenAI, Gemini at minimum)
 - **F5.2** P0 Tool-use loop aggregating all configured MCPs into one tool surface
 - **F5.3** P0 Dynamic system prompt: base persona + protocol knowledge from cron
-- **F5.4** P0 Conversation state persistence per user (since AgentKit is stateless)
+- **F5.4** P0 Conversation state persistence (threads, runs, steps, tool_calls, embeddings — see Section 10)
 - **F5.5** P0 Text CLI interface (REPL)
 - **F5.6** P1 Local web UI (React + Tailwind, single-page chat)
-- **F5.7** P1 Streaming responses
+- **F5.7** P0 Streaming responses (`streamText`) — load-bearing for realtime reasoning UX
 - **F5.8** P2 Voice interface via dTelecom provider (x402 micropayments)
+- **F5.9** P0 First-class `Agent` type + AgentRegistry (multi-agent ready, single agent v1)
+- **F5.10** P0 Vercel AI SDK (`ai` package) as agent loop substrate
+- **F5.11** P0 Tag-based KeeperHub middleware: tools self-declare `mutates: true`
 
 ## 6. Onboarding (the wedge)
 
@@ -103,14 +108,33 @@ Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hoste
 - **F9.2** P0 Tool: `query_eth_knowledge` — hits local PGLite vector DB, returns top-N chunks + cited sources
 - **F9.3** P0 Tool: `eth_action` — runs full agent loop, returns KeeperHub workflow URL + tx hash
 - **F9.4** P0 Tool: `eth_status` — wallet, chains, last-sync, enabled MCPs
-- **F9.5** P1 HTTP/SSE transport in addition to stdio (for remote hosts)
-- **F9.6** P1 Pass-through namespace: re-export curated DeFi MCPs under `talos.*` so importers get the bundle from one connector
-- **F9.7** P1 README section: drop-in configs for OpenClaw, Hermes, Claude Desktop, Cursor
-- **F9.8** P2 Auth token gate so multiple hosts can share one Talos instance safely
+- **F9.5** P0 Tool: `talos_new_thread` — resets the host's session thread
+- **F9.6** P0 One thread per host session (continuity across `eth_action` calls)
+- **F9.7** P1 HTTP/SSE transport in addition to stdio (for remote hosts)
+- **F9.8** P1 Pass-through namespace: re-export curated DeFi MCPs under `talos.*` so importers get the bundle from one connector
+- **F9.9** P1 README section: drop-in configs for OpenClaw, Hermes, Claude Desktop, Cursor
+- **F9.10** P2 Auth token gate so multiple hosts can share one Talos instance safely
+
+## 10. Conversation Layer
+
+Detail in [[architecture]] §Persistence + §Memory.
+
+- **F10.1** P0 PGLite single-store at `~/.config/talos/talos.db` (knowledge + conversations in one DB)
+- **F10.2** P0 Drizzle ORM with auto-generated SQL migrations
+- **F10.3** P0 Schema: `threads`, `runs`, `steps`, `tool_calls`, `message_embeddings`, `knowledge_chunks`
+- **F10.4** P0 Hybrid retrieval: pgvector HNSW (semantic) + tsvector GIN (keyword)
+- **F10.5** P0 Three-tier memory: hot (last 20 runs), warm (thread summary), cold (cross-thread recall)
+- **F10.6** P0 Adaptive cross-thread recall: cosine ≥ 0.78, top-3, always-search threshold-gated
+- **F10.7** P0 Turn-count summarization: regenerate thread summary every 20 runs
+- **F10.8** P0 OpenAI `text-embedding-3-small` (1536-dim) for all embeddings
+- **F10.9** P1 Thread title auto-generated via cheap-model call (haiku) on first run, async
+- **F10.10** P1 `talos search "query"` for hybrid keyword + semantic recall across all threads
+- **F10.11** P1 `talos thread <id>` to load and continue past threads
+- **F10.12** P2 In-memory LRU cache for query embeddings (1000 entries)
 
 ## Counts
 
-68 features. P0 = 36. P1 = 25. P2 = 7.
+86 features. P0 = 55. P1 = 23. P2 = 8.
 
 ## Open questions (deferred)
 
