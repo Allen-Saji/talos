@@ -12,7 +12,6 @@ Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hoste
 ## Sponsor tracks
 
 - **F0.1** P0 KeeperHub ($5k primary) — prize page names "OpenClaw" connector explicitly
-- **F0.2** P2 0G Framework ($7.5k stretch) — only if F4.8 ships
 
 ## 1. Wallet Layer
 
@@ -97,11 +96,11 @@ Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hoste
 - **F8.1** P0 Recorded video: install + 3 scripted interactions in under 3 minutes
 - **F8.2** P0 Live demo URL or downloadable binary judges can run
 - **F8.3** P0 Architecture diagram (BBG-style via diagram-kit)
-- **F8.4** P0 Submission writeups: one per sponsor track (KeeperHub, 0G if applicable)
+- **F8.4** P0 Submission writeup for KeeperHub track
 
 ## Counts
 
-62 features. P0 = 32. P1 = 22. P2 = 8.
+61 features. P0 = 32. P1 = 22. P2 = 7.
 
 ## Open questions (deferred)
 
