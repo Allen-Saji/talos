@@ -57,8 +57,7 @@ Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hoste
 - **F4.5** P1 Source set extended: governance forums (Tally + Snapshot + Discourse), Mirror posts, X lists
 - **F4.6** P1 User-configurable source list (`sources.yaml`)
 - **F4.7** P1 First-run synchronous fetch on init so demo has fresh data immediately
-- **F4.8** P2 0G Compute TeeML attestation on summarization step (verifiable knowledge layer)
-- **F4.9** P2 Diff view CLI command: "what changed in ETH ecosystem since yesterday"
+- **F4.8** P2 Diff view CLI command: "what changed in ETH ecosystem since yesterday"
 
 ## 5. Agent Runtime
 
@@ -100,7 +99,7 @@ Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hoste
 
 ## Counts
 
-61 features. P0 = 32. P1 = 22. P2 = 7.
+60 features. P0 = 32. P1 = 22. P2 = 6.
 
 ## Open questions (deferred)
 
