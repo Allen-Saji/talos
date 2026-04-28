@@ -94,6 +94,12 @@ export const messageEmbeddings = pgTable(
     role: text('role').notNull(),
     content: text('content').notNull(),
     embedding: vector('embedding', { dimensions: 1536 }).notNull(),
+    // TODO(persistence-impl): wire `tsv` as a STORED generated column for hybrid
+    // retrieval (HNSW + GIN). drizzle-orm 0.45.2 rejected the 2-arg
+    // `.generatedAlwaysAs(sql, { mode: 'stored' })` signature; resolve by
+    // (1) finding the correct API for this version, (2) using a Postgres
+    // trigger via custom migration, or (3) computing in TS at insert time.
+    // Also add the GIN index on `tsv` once the column is populated.
     tsv: text('tsv'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
