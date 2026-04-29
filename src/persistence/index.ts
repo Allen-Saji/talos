@@ -1,11 +1,5 @@
-import { TalosNotImplementedError } from '@/shared/errors'
-
+export * from './client'
+export * from './migrations'
+export * from './ownership'
+export * from './queries'
 export * from './schema'
-
-export function createDb(): never {
-  throw new TalosNotImplementedError('persistence.createDb')
-}
-
-export function runMigrations(): never {
-  throw new TalosNotImplementedError('persistence.runMigrations')
-}
