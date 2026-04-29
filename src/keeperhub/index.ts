@@ -1,19 +1,45 @@
-import { TalosNotImplementedError } from '@/shared/errors'
-
-export const KNOWN_READONLY: readonly RegExp[] = [
-  /_get_/,
-  /_quote$/,
-  /_status$/,
-  /_balance$/,
-  /_position$/,
-  /_search/,
-  /^blockscout_/,
-] as const
-
-export function shouldAudit(_toolName: string, _annotations?: { mutates?: boolean }): never {
-  throw new TalosNotImplementedError('keeperhub.shouldAudit')
-}
-
-export function createKeeperHubMiddleware(): never {
-  throw new TalosNotImplementedError('keeperhub.createKeeperHubMiddleware')
-}
+export {
+  type ContractCallInput,
+  createKeeperHubClient,
+  type ExecutionResult,
+  type KeeperHubClient,
+  type KeeperHubClientOpts,
+  type TransferInput,
+  type WorkflowExecutionStatus,
+} from './client'
+export {
+  type AnnotationLookup,
+  createKeeperHubMiddleware,
+  type KeeperHubMiddlewareDeps,
+  KNOWN_READONLY,
+  type RunContext,
+  type RunContextProvider,
+  type ShouldAuditDecision,
+  shouldAudit,
+  type ToolMiddleware,
+} from './middleware'
+export {
+  type AuthServerMetadata,
+  buildAuthorizeUrl,
+  discoverAuthServer,
+  type ExchangeCodeOpts,
+  exchangeCode,
+  generatePkce,
+  generateState,
+  type PkcePair,
+  type RefreshTokenOpts,
+  type RegisterClientOpts,
+  type RegisteredClient,
+  refreshToken,
+  registerClient,
+  type TokenResponse,
+} from './oauth'
+export {
+  clearSession,
+  EXPIRY_BUFFER_MS,
+  isExpired,
+  loadSession,
+  type StoredSession,
+  saveSession,
+  sessionFromResponse,
+} from './token'

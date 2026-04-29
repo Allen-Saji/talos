@@ -13,6 +13,8 @@ export interface McpServerConfig {
   command?: string
   args?: string[]
   url?: string
+  /** Extra headers for HTTP transport (e.g. `Authorization: Bearer ...`). */
+  headers?: Record<string, string>
 }
 
 /**

@@ -69,6 +69,52 @@ export async function recordToolCall(db: Db, input: NewToolCall) {
   return row
 }
 
+export type ToolAuditMeta = {
+  /** True if KeeperHub middleware would route this through workflow audit. */
+  shouldAudit: boolean
+  /** Why the decision was made (e.g. KNOWN_READONLY, annotation_readOnly, audit_default). */
+  reason: string
+  /** KeeperHub workflow / execution / tx wiring (populated by #10's protocol-tool routing). */
+  workflowId?: string
+  executionId?: string
+  txHash?: string
+  /** Free-form details passed by the middleware (e.g. timing, route taken). */
+  details?: Record<string, unknown>
+}
+
+export type ToolCallAuditInput = {
+  runId: string
+  stepId?: string | null
+  toolCallId: string
+  toolName: string
+  args?: unknown
+  result?: unknown
+  error?: string | null
+  audit: ToolAuditMeta
+  startedAt?: Date
+  finishedAt?: Date
+}
+
+/**
+ * Append a tool-call row with structured audit metadata. Used by the
+ * KeeperHub middleware on every tool invocation; never throws on
+ * malformed audit metadata — failures are surfaced to the caller.
+ */
+export async function appendToolCallAudit(db: Db, input: ToolCallAuditInput) {
+  return recordToolCall(db, {
+    runId: input.runId,
+    stepId: input.stepId ?? null,
+    toolCallId: input.toolCallId,
+    toolName: input.toolName,
+    args: input.args ?? null,
+    result: input.result ?? null,
+    error: input.error ?? null,
+    audit: input.audit,
+    ...(input.startedAt ? { startedAt: input.startedAt } : {}),
+    ...(input.finishedAt ? { finishedAt: input.finishedAt } : {}),
+  })
+}
+
 export async function insertMessageEmbedding(
   db: Db,
   input: Omit<NewMessageEmbedding, 'embedding'> & { embedding: number[] },
