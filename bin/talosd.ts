@@ -1,19 +1,10 @@
 #!/usr/bin/env node
-import { loadEnv } from '@/config/env'
-import { paths } from '@/config/paths'
+import { startDaemon } from '@/daemon'
 import { logger } from '@/shared/logger'
 
 async function main(): Promise<void> {
-  const env = loadEnv()
-  logger.info(
-    {
-      port: env.TALOS_DAEMON_PORT,
-      configDir: paths.configDir,
-      dataDir: paths.dataDir,
-    },
-    'talosd booting',
-  )
-  logger.warn('talosd: control plane not yet implemented')
+  const handle = await startDaemon()
+  await handle.done
   process.exit(0)
 }
 

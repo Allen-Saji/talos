@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import fs from 'node:fs'
+import path from 'node:path'
 import { Command } from 'commander'
 import { paths } from '@/config/paths'
+import {
+  formatDiagnostics,
+  renderServiceArtifact,
+  runDiagnostics,
+  writeServiceArtifact,
+} from '@/daemon'
 import { assertNoLiveDaemon, createDb, runMigrations } from '@/persistence'
 import { TalosNotImplementedError } from '@/shared/errors'
 import { logger } from '@/shared/logger'
@@ -20,18 +27,29 @@ program
 
 program
   .command('install-service')
-  .description('Install talosd as launchd or systemd user service')
-  .action(() => {
-    logger.info('install-service: not implemented')
-    throw new TalosNotImplementedError('talos install-service')
+  .description('Install talosd as launchd (macOS) or systemd user service (Linux)')
+  .option('--print', 'render the service file to stdout without writing')
+  .option('--bin <path>', 'override talosd binary path (default: resolve from this script)')
+  .action((opts: { print?: boolean; bin?: string }) => {
+    const binPath = opts.bin ?? path.resolve(path.dirname(process.argv[1] ?? ''), 'talosd.js')
+    const artifact = renderServiceArtifact({ binPath })
+    if (opts.print) {
+      process.stdout.write(artifact.body)
+      return
+    }
+    writeServiceArtifact(artifact)
+    logger.info({ servicePath: artifact.servicePath }, 'service file written')
+    process.stdout.write(`\nNext steps:\n${artifact.followups.map((c) => `  ${c}`).join('\n')}\n`)
   })
 
 program
   .command('doctor')
   .description('Diagnose the current Talos installation')
-  .action(() => {
-    logger.info('doctor: not implemented')
-    throw new TalosNotImplementedError('talos doctor')
+  .action(async () => {
+    const results = await runDiagnostics()
+    process.stdout.write(`${formatDiagnostics(results)}\n`)
+    const allPass = results.every((r) => r.pass)
+    process.exit(allPass ? 0 : 1)
   })
 
 program

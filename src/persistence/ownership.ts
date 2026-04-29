@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import path from 'node:path'
 import { paths as defaultPaths, type Paths } from '@/config/paths'
 import { TalosDbError } from '@/shared/errors'
 
@@ -56,4 +57,22 @@ function isAlive(pid: number): boolean {
     if (code === 'EPERM') return true
     throw err
   }
+}
+
+/**
+ * Write the current process pid to `paths.pidPath`. Creates the parent
+ * directory if missing. Atomic-ish via fs.writeFileSync (PGLite ownership
+ * model only ever has one writer; race is not a real concern).
+ */
+export function writePidFile(opts: { paths?: Pick<Paths, 'pidPath'>; pid?: number } = {}): void {
+  const target = (opts.paths ?? defaultPaths).pidPath
+  const pid = opts.pid ?? process.pid
+  fs.mkdirSync(path.dirname(target), { recursive: true })
+  fs.writeFileSync(target, `${pid}\n`, { mode: 0o644 })
+}
+
+/** Remove the pidfile if present. Idempotent — safe to call from cleanup paths. */
+export function removePidFile(opts: { paths?: Pick<Paths, 'pidPath'> } = {}): void {
+  const target = (opts.paths ?? defaultPaths).pidPath
+  fs.rmSync(target, { force: true })
 }
