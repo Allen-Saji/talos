@@ -49,33 +49,33 @@ export function parseToolAnnotations(tool: Record<string, unknown>): ToolAnnotat
 }
 
 /**
- * Flatten MCP tool result to a single string or parsed JSON.
+ * Flatten MCP tool result to a single string or parsed JSON object.
  *
  * MCP returns: { content: [{ type: 'text', text: '{"foo":1}' }] }
  * This function flattens to:
- *   - single text item → string
- *   - single text item that's valid JSON → parsed object
- *   - multiple text items → joined with \n\n
+ *   - single text item that looks like a JSON object (`{...}`) → parsed object
+ *   - single text item otherwise → string
+ *   - multiple text items → joined with \n\n (object-parse on the join only if it starts with `{`)
  *   - error → wrapped in <error> tag
+ *
+ * JSON parsing is gated on `text.trim().startsWith('{')` so the return type
+ * stays honest: `string | Record<string, unknown>`. Scalars like `"42"` /
+ * `"true"` and arrays like `"[1,2]"` pass through as text — callers that need
+ * those should JSON.parse themselves.
  */
 export function flattenToolResult(result: unknown): string | Record<string, unknown> {
   if (result == null) return ''
 
-  // If it's already a string, return as-is
   if (typeof result === 'string') return result
-
-  // If it's not an object, stringify
   if (typeof result !== 'object') return String(result)
 
   const obj = result as Record<string, unknown>
 
-  // Handle MCP content array
   if (Array.isArray(obj.content)) {
     const items = obj.content as Array<{ type: string; text?: string; isError?: boolean }>
 
     if (items.length === 0) return ''
 
-    // Check for error
     if (items.some((i) => i.isError)) {
       const errorTexts = items
         .filter((i) => i.type === 'text')
@@ -84,31 +84,29 @@ export function flattenToolResult(result: unknown): string | Record<string, unkn
       return `<error>${errorTexts}</error>`
     }
 
-    // Single text item — try JSON parse
-    const first = items[0]
-    if (items.length === 1 && first?.type === 'text' && first.text) {
-      const text = first.text
-      try {
-        return JSON.parse(text) as Record<string, unknown>
-      } catch {
-        return text
-      }
+    const texts = items.filter((i) => i.type === 'text').map((i) => i.text ?? '')
+
+    if (texts.length === 1) {
+      const text = texts[0] ?? ''
+      return tryParseJsonObject(text) ?? text
     }
 
-    // Multiple text items — join
-    const texts = items
-      .filter((i) => i.type === 'text')
-      .map((i) => i.text ?? '')
-      .join('\n\n')
-
-    // Try JSON parse on joined text
-    try {
-      return JSON.parse(texts) as Record<string, unknown>
-    } catch {
-      return texts
-    }
+    const joined = texts.join('\n\n')
+    return tryParseJsonObject(joined) ?? joined
   }
 
-  // Not MCP format — return as-is (might already be flat)
   return obj as unknown as Record<string, unknown>
+}
+
+function tryParseJsonObject(text: string): Record<string, unknown> | null {
+  if (!text.trim().startsWith('{')) return null
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+    return null
+  } catch {
+    return null
+  }
 }
