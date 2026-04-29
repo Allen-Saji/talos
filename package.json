@@ -12,7 +12,7 @@
     "url": "git+https://github.com/Allen-Saji/talos.git"
   },
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=22"
   },
   "bin": {
     "talos": "./dist/bin/talos.js",
