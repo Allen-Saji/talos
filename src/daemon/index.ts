@@ -1,4 +1,9 @@
 export {
+  type EnsureDaemonOpts,
+  type EnsureDaemonResult,
+  ensureDaemonRunning,
+} from './autostart'
+export {
   type DiagnosticResult,
   formatDiagnostics,
   type RunDiagnosticsOpts,

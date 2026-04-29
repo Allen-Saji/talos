@@ -2,8 +2,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { Command } from 'commander'
+import { runRepl, runStdioMcpProxy } from '@/channels'
 import { paths } from '@/config/paths'
+import { ensureToken } from '@/config/token'
 import {
+  ensureDaemonRunning,
   formatDiagnostics,
   renderServiceArtifact,
   runDiagnostics,
@@ -55,9 +58,36 @@ program
 program
   .command('repl')
   .description('Open an interactive REPL connected to talosd')
-  .action(() => {
-    logger.info('repl: not implemented')
-    throw new TalosNotImplementedError('talos repl')
+  .option('--port <number>', 'daemon port', (v) => Number.parseInt(v, 10))
+  .option('--no-autostart', 'do not auto-spawn talosd if not running')
+  .action(async (opts: { port?: number; autostart?: boolean }) => {
+    const port = opts.port ?? Number(process.env.TALOS_DAEMON_PORT ?? 7711)
+    const url = `ws://127.0.0.1:${port}`
+    if (opts.autostart !== false) {
+      await ensureDaemonRunning({ url })
+    }
+    const token = await ensureToken()
+    const result = await runRepl({ daemonUrl: url, token })
+    process.exit(result.exitCode)
+  })
+
+program
+  .command('serve')
+  .description('Run a Talos channel adapter on stdin/stdout')
+  .option('--mcp', 'serve as a stdio MCP server (proxies into talosd)')
+  .option('--port <number>', 'daemon port', (v) => Number.parseInt(v, 10))
+  .option('--no-autostart', 'do not auto-spawn talosd if not running')
+  .action(async (opts: { mcp?: boolean; port?: number; autostart?: boolean }) => {
+    if (!opts.mcp) {
+      throw new TalosNotImplementedError('talos serve (no adapter selected — pass --mcp)')
+    }
+    const port = opts.port ?? Number(process.env.TALOS_DAEMON_PORT ?? 7711)
+    const url = `ws://127.0.0.1:${port}`
+    if (opts.autostart !== false) {
+      await ensureDaemonRunning({ url })
+    }
+    const token = await ensureToken()
+    await runStdioMcpProxy({ daemonUrl: url, token })
   })
 
 program
