@@ -301,6 +301,60 @@ describe('McpHost', () => {
     await host.stop()
   })
 
+  it('applies staticAnnotations overrides during registration', async () => {
+    mockCreateMCPClient.mockResolvedValueOnce({
+      tools: vi.fn().mockResolvedValue({
+        // No MCP-side annotations on this tool — relies on the static override.
+        resolve_ens_name: {
+          description: 'Resolve ENS name to address',
+          execute: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: '0xabc' }] }),
+        },
+        // Tool that ships an annotation; override should win for the field it sets.
+        write_contract: {
+          description: 'Write to a contract',
+          annotations: { mutates: true },
+          execute: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] }),
+        },
+        // Tool with no override: base annotations apply unchanged.
+        get_balance: {
+          description: 'Get balance',
+          execute: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: '1' }] }),
+        },
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const host = new McpHost({ maxAttempts: 1 })
+    await host.start([
+      {
+        name: 'evmmcp',
+        transport: 'http',
+        url: 'http://localhost:0/evmmcp',
+        staticAnnotations: {
+          resolve_ens_name: { readOnly: true },
+          write_contract: { readOnly: true }, // intentional override of an upstream-set field
+        },
+      },
+    ])
+
+    const tools = host.listTools()
+    const byName = Object.fromEntries(tools.map((t) => [t.namespacedName, t]))
+
+    // Override applied to a tool with no upstream annotations.
+    expect(byName.evmmcp_resolve_ens_name?.annotations.readOnly).toBe(true)
+    expect(byName.evmmcp_resolve_ens_name?.annotations.mutates).toBe(false)
+
+    // Override wins over MCP-supplied annotation; non-overridden fields preserved.
+    expect(byName.evmmcp_write_contract?.annotations.readOnly).toBe(true)
+    expect(byName.evmmcp_write_contract?.annotations.mutates).toBe(true)
+
+    // No override → base annotations untouched.
+    expect(byName.evmmcp_get_balance?.annotations.readOnly).toBe(false)
+    expect(byName.evmmcp_get_balance?.annotations.mutates).toBe(false)
+
+    await host.stop()
+  })
+
   it('aborts a tool call that exceeds the timeout', async () => {
     mockCreateMCPClient.mockResolvedValueOnce({
       tools: vi.fn().mockResolvedValue({
