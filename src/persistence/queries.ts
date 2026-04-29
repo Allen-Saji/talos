@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
+import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core'
 import { TalosDbError } from '@/shared/errors'
-import type { DbHandle } from './client'
 import {
   messageEmbeddings,
   type NewMessageEmbedding,
@@ -18,7 +18,10 @@ import {
 
 const EMBEDDING_DIMS = 1536
 
-type Db = DbHandle['db']
+// biome-ignore lint/suspicious/noExplicitAny: drizzle internal type parameters
+export type Db = PgDatabase<PgQueryResultHKT, any, any>
+
+type ExecuteResult = { rows: Array<Record<string, unknown>> }
 
 export async function upsertThread(db: Db, input: NewThread) {
   const [row] = await db
@@ -131,7 +134,7 @@ export async function searchMessages(
 
   const embeddingLiteral = `[${queryEmbedding.join(',')}]`
 
-  const result = await db.execute(sql`
+  const result = (await db.execute(sql`
     WITH v AS (
       SELECT id, thread_id, run_id, role, content,
              1 - (embedding <=> ${embeddingLiteral}::vector) AS vsim
@@ -154,9 +157,9 @@ export async function searchMessages(
     FROM v LEFT JOIN k USING (id)
     ORDER BY score DESC
     LIMIT ${topK}
-  `)
+  `)) as ExecuteResult
 
-  return (result.rows as Array<Record<string, unknown>>).map(rowToHit)
+  return result.rows.map(rowToHit)
 }
 
 // ---------- thread summaries (Warm tier) ----------
@@ -177,12 +180,12 @@ export async function writeThreadSummary(
 }
 
 export async function latestThreadSummary(db: Db, threadId: string) {
-  const result = await db.execute(sql`
+  const result = (await db.execute(sql`
     SELECT * FROM thread_summaries
     WHERE thread_id = ${threadId}
     ORDER BY created_at DESC
     LIMIT 1
-  `)
+  `)) as ExecuteResult
   const row = result.rows[0]
   return row ? (row as unknown as ThreadSummaryRow) : null
 }
@@ -224,16 +227,16 @@ export async function searchThreadSummaries(
 
   const embeddingLiteral = `[${queryEmbedding.join(',')}]`
 
-  const result = await db.execute(sql`
+  const result = (await db.execute(sql`
     SELECT id, thread_id, summary, created_at,
            1 - (embedding <=> ${embeddingLiteral}::vector) AS vsim
     FROM thread_summaries
     WHERE (${excludeThreadId}::text IS NULL OR thread_id <> ${excludeThreadId})
     ORDER BY embedding <=> ${embeddingLiteral}::vector
     LIMIT ${topK}
-  `)
+  `)) as ExecuteResult
 
-  return (result.rows as Array<Record<string, unknown>>)
+  return result.rows
     .map((row) => ({
       id: String(row.id),
       threadId: String(row.thread_id),
