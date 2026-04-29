@@ -272,7 +272,9 @@ export class McpHost {
 
         for (const [originalName, tool] of Object.entries(mcpTools)) {
           const namespaced = namespaceToolName(config.name, originalName)
-          const annotations = parseToolAnnotations(tool as Record<string, unknown>)
+          const baseAnnotations = parseToolAnnotations(tool as Record<string, unknown>)
+          const overrides = config.staticAnnotations?.[originalName]
+          const annotations = overrides ? { ...baseAnnotations, ...overrides } : baseAnnotations
 
           const namespacedEntry: NamespacedToolEntry = {
             namespacedName: namespaced,

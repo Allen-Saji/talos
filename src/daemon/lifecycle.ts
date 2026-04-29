@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import { loadEnv, resetEnvCache } from '@/config/env'
 import { paths } from '@/config/paths'
 import { ensureToken } from '@/config/token'
+import { defaultMcpServers, McpHost, McpToolSource } from '@/mcp-host'
 import {
   assertNoLiveDaemon,
   createDb,
@@ -36,6 +37,11 @@ export type StartDaemonOpts = {
   installSignalHandlers?: boolean
   /** Use ephemeral PGLite (no on-disk file). Tests only. */
   ephemeralDb?: boolean
+  /**
+   * Skip booting the MCP host (no third-party servers spawned). Useful for
+   * tests that don't need tools, or for offline development.
+   */
+  disableMcpHost?: boolean
 }
 
 export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<DaemonHandle> {
@@ -68,8 +74,21 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     : await createDb({ path: paths.dbPath })
   await runMigrations(dbHandle)
 
-  // Build runtime deps. Tools / KH middleware / knowledge / summarizer / fact
-  // pipeline are deferred to follow-up issues (#10/#11/#16/#17 LLM impls).
+  // MCP host hosts the third-party tool servers. Started before the runtime
+  // so the runtime can hold a stable McpToolSource reference. Connection
+  // failures are non-fatal — the daemon keeps booting, tools just stay empty
+  // until the operator fixes the underlying issue.
+  const mcpHost = startOpts.disableMcpHost ? null : new McpHost()
+  if (mcpHost) {
+    try {
+      await mcpHost.start(defaultMcpServers())
+    } catch (err) {
+      logger.warn({ err }, 'MCP host failed to connect to all servers — continuing with no tools')
+    }
+  }
+
+  // Build runtime deps. KH middleware / knowledge / summarizer / fact
+  // pipeline are deferred to follow-up issues (#11/#16/#17 LLM impls).
   const agents = new AgentRegistry()
   agents.register(TALOS_ETH_AGENT, { default: true })
   const providers = createProviderRouter()
@@ -79,7 +98,7 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     providers,
     embeddings,
     agents,
-    toolSources: [],
+    toolSources: mcpHost ? [new McpToolSource(mcpHost)] : [],
   })
 
   // Boot control plane.
@@ -117,6 +136,13 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
         await controlPlane.stop()
       } catch (err) {
         logger.warn({ err }, 'error stopping control plane')
+      }
+      if (mcpHost) {
+        try {
+          await mcpHost.stop()
+        } catch (err) {
+          logger.warn({ err }, 'error stopping mcp host')
+        }
       }
       try {
         await dbHandle.close()
