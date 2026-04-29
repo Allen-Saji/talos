@@ -4,7 +4,11 @@ import { TalosConfigError } from '@/shared/errors'
 
 const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
-  KEEPERHUB_URL: z.url().optional(),
+  OPENAI_BASE_URL: z.string().url().optional(),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_BASE_URL: z.string().url().optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  KEEPERHUB_URL: z.string().url().optional(),
   TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
   TALOS_DAEMON_PORT: z.coerce.number().int().min(1).max(65535).default(7711),
   TALOS_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),

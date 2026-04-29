@@ -45,6 +45,7 @@
     ]
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.72",
     "@ai-sdk/mcp": "latest",
     "@ai-sdk/openai": "latest",
     "@electric-sql/pglite": "latest",

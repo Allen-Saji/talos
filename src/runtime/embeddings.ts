@@ -8,6 +8,7 @@ import type { EmbeddingsService } from './types'
  */
 export type EmbeddingsConfig = {
   openaiApiKey?: string
+  openaiBaseUrl?: string
   model?: string
 }
 
@@ -16,6 +17,7 @@ const DEFAULT_MODEL = 'text-embedding-3-small'
 export function createOpenAIEmbeddings(config: EmbeddingsConfig = {}): EmbeddingsService {
   const openaiClient = createOpenAI({
     apiKey: config.openaiApiKey ?? process.env.OPENAI_API_KEY,
+    baseURL: config.openaiBaseUrl ?? process.env.OPENAI_BASE_URL,
   })
   const model = openaiClient.embedding(config.model ?? DEFAULT_MODEL)
 
