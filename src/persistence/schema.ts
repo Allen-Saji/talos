@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  type AnyPgColumn,
   index,
   integer,
   jsonb,
@@ -14,6 +15,8 @@ import {
 export const runStatus = pgEnum('run_status', ['running', 'completed', 'failed', 'cancelled'])
 
 export const stepRole = pgEnum('step_role', ['assistant', 'tool'])
+
+export const factEvent = pgEnum('fact_event', ['ADD', 'UPDATE', 'DELETE'])
 
 export const threads = pgTable(
   'threads',
@@ -147,6 +150,51 @@ export const knowledgeChunks = pgTable(
   ],
 )
 
+export const facts = pgTable(
+  'facts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    agentId: text('agent_id').notNull(),
+    channel: text('channel').notNull(),
+    threadId: text('thread_id'),
+    text: text('text').notNull(),
+    embedding: vector('embedding', { dimensions: 1536 }).notNull(),
+    hash: text('hash').notNull(),
+    attributedToRunId: uuid('attributed_to_run_id').references(() => runs.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    supersededBy: uuid('superseded_by').references((): AnyPgColumn => facts.id, {
+      onDelete: 'set null',
+    }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('facts_scope_idx').on(t.agentId, t.channel, t.threadId),
+    index('facts_live_hash_idx')
+      .on(t.agentId, t.channel, t.hash)
+      .where(sql`deleted_at IS NULL AND superseded_by IS NULL`),
+    index('facts_hnsw_idx').using('hnsw', sql`${t.embedding} vector_cosine_ops`),
+  ],
+)
+
+export const factHistory = pgTable(
+  'fact_history',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    factId: uuid('fact_id')
+      .notNull()
+      .references(() => facts.id, { onDelete: 'cascade' }),
+    event: factEvent('event').notNull(),
+    oldText: text('old_text'),
+    newText: text('new_text'),
+    runId: uuid('run_id').references(() => runs.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('fact_history_fact_idx').on(t.factId), index('fact_history_run_idx').on(t.runId)],
+)
+
 export type Thread = typeof threads.$inferSelect
 export type NewThread = typeof threads.$inferInsert
 export type Run = typeof runs.$inferSelect
@@ -161,3 +209,7 @@ export type KnowledgeChunk = typeof knowledgeChunks.$inferSelect
 export type NewKnowledgeChunk = typeof knowledgeChunks.$inferInsert
 export type ThreadSummary = typeof threadSummaries.$inferSelect
 export type NewThreadSummary = typeof threadSummaries.$inferInsert
+export type Fact = typeof facts.$inferSelect
+export type NewFact = typeof facts.$inferInsert
+export type FactHistoryRow = typeof factHistory.$inferSelect
+export type NewFactHistoryRow = typeof factHistory.$inferInsert

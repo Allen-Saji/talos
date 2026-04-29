@@ -1,4 +1,5 @@
 export * from './client'
+export * from './facts'
 export * from './migrations'
 export * from './ownership'
 export * from './queries'
