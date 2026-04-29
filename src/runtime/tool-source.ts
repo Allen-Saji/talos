@@ -1,7 +1,7 @@
 import type { Tool } from 'ai'
 import type { ToolSource } from './types'
 
-/** No-op tool source. Default for v1; replaced by McpToolSource when #6 lands. */
+/** No-op tool source. Default when no MCP servers are configured. Use McpToolSource from @/mcp-host for real tools. */
 export const EmptyToolSource: ToolSource = {
   getTools: async () => ({}),
 }

@@ -2,10 +2,19 @@ import 'dotenv/config'
 import { z } from 'zod'
 import { TalosConfigError } from '@/shared/errors'
 
+/** Coerce empty string to undefined (dotenv sets VAR= as "") */
+const optionalUrl = z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional())
+
+const optionalNonEmpty = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z.string().min(1).optional(),
+)
+
 const EnvSchema = z.object({
-  OPENAI_API_KEY: z.string().min(1).optional(),
-  KEEPERHUB_URL: z.url().optional(),
-  TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
+  OPENAI_API_KEY: optionalNonEmpty,
+  OPENAI_BASE_URL: optionalUrl,
+  KEEPERHUB_URL: optionalUrl,
+  TELEGRAM_BOT_TOKEN: optionalNonEmpty,
   TALOS_DAEMON_PORT: z.coerce.number().int().min(1).max(65535).default(7711),
   TALOS_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   TALOS_DATA_DIR: z.string().optional(),

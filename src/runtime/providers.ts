@@ -12,11 +12,13 @@ import type { ProviderRouter } from './types'
  */
 export type ProviderConfig = {
   openaiApiKey?: string
+  openaiBaseUrl?: string
 }
 
 export function createProviderRouter(config: ProviderConfig = {}): ProviderRouter {
   const openaiClient = createOpenAI({
     apiKey: config.openaiApiKey ?? process.env.OPENAI_API_KEY,
+    baseURL: config.openaiBaseUrl ?? process.env.OPENAI_BASE_URL,
   })
 
   return {
