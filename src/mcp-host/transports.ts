@@ -37,6 +37,7 @@ export function buildTransport(
     return {
       type: 'http' as const,
       url: config.url,
+      ...(config.headers ? { headers: config.headers } : {}),
     }
   }
 
