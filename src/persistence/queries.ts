@@ -7,9 +7,11 @@ import {
   type NewRun,
   type NewStep,
   type NewThread,
+  type NewThreadSummary,
   type NewToolCall,
   runs,
   steps,
+  threadSummaries,
   threads,
   toolCalls,
 } from './schema'
@@ -155,6 +157,102 @@ export async function searchMessages(
   `)
 
   return (result.rows as Array<Record<string, unknown>>).map(rowToHit)
+}
+
+// ---------- thread summaries (Warm tier) ----------
+
+export async function writeThreadSummary(
+  db: Db,
+  input: Omit<NewThreadSummary, 'embedding'> & { embedding: number[] },
+) {
+  if (input.embedding.length !== EMBEDDING_DIMS) {
+    throw new TalosDbError(
+      `summary embedding must be ${EMBEDDING_DIMS}-d (got ${input.embedding.length})`,
+      'DB_BAD_EMBEDDING',
+    )
+  }
+  const [row] = await db.insert(threadSummaries).values(input).returning()
+  if (!row) throw new TalosDbError('writeThreadSummary returned no row', 'DB_NO_ROW')
+  return row
+}
+
+export async function latestThreadSummary(db: Db, threadId: string) {
+  const result = await db.execute(sql`
+    SELECT * FROM thread_summaries
+    WHERE thread_id = ${threadId}
+    ORDER BY created_at DESC
+    LIMIT 1
+  `)
+  const row = result.rows[0]
+  return row ? (row as unknown as ThreadSummaryRow) : null
+}
+
+export type ThreadSummaryHit = {
+  id: string
+  threadId: string
+  summary: string
+  vsim: number
+  createdAt: string
+}
+
+export type ThreadSummarySearchOptions = {
+  topK?: number
+  excludeThreadId?: string
+  threshold?: number
+}
+
+/**
+ * Cross-thread cold recall over thread_summaries. Vector-only (no keyword fusion)
+ * because summaries are already condensed text — the vector is the high-signal channel.
+ * Threshold-gated: returns only rows with vsim >= threshold (default 0.78 from
+ * architecture's adaptive cold recall rule).
+ */
+export async function searchThreadSummaries(
+  db: Db,
+  queryEmbedding: number[],
+  options: ThreadSummarySearchOptions = {},
+): Promise<ThreadSummaryHit[]> {
+  if (queryEmbedding.length !== EMBEDDING_DIMS) {
+    throw new TalosDbError(
+      `queryEmbedding must be ${EMBEDDING_DIMS}-d (got ${queryEmbedding.length})`,
+      'DB_BAD_EMBEDDING',
+    )
+  }
+  const topK = options.topK ?? 3
+  const threshold = options.threshold ?? 0.78
+  const excludeThreadId = options.excludeThreadId ?? null
+
+  const embeddingLiteral = `[${queryEmbedding.join(',')}]`
+
+  const result = await db.execute(sql`
+    SELECT id, thread_id, summary, created_at,
+           1 - (embedding <=> ${embeddingLiteral}::vector) AS vsim
+    FROM thread_summaries
+    WHERE (${excludeThreadId}::text IS NULL OR thread_id <> ${excludeThreadId})
+    ORDER BY embedding <=> ${embeddingLiteral}::vector
+    LIMIT ${topK}
+  `)
+
+  return (result.rows as Array<Record<string, unknown>>)
+    .map((row) => ({
+      id: String(row.id),
+      threadId: String(row.thread_id),
+      summary: String(row.summary),
+      vsim: Number(row.vsim),
+      createdAt: String(row.created_at),
+    }))
+    .filter((h) => h.vsim >= threshold)
+}
+
+type ThreadSummaryRow = {
+  id: string
+  thread_id: string
+  run_range_start: string | null
+  run_range_end: string | null
+  summary: string
+  embedding: unknown
+  token_count: number | null
+  created_at: string
 }
 
 function rowToHit(row: Record<string, unknown>): SearchHit {

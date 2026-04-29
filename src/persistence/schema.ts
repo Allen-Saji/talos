@@ -109,6 +109,26 @@ export const messageEmbeddings = pgTable(
   ],
 )
 
+export const threadSummaries = pgTable(
+  'thread_summaries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    threadId: text('thread_id')
+      .notNull()
+      .references(() => threads.id, { onDelete: 'cascade' }),
+    runRangeStart: uuid('run_range_start').references(() => runs.id, { onDelete: 'set null' }),
+    runRangeEnd: uuid('run_range_end').references(() => runs.id, { onDelete: 'set null' }),
+    summary: text('summary').notNull(),
+    embedding: vector('embedding', { dimensions: 1536 }).notNull(),
+    tokenCount: integer('token_count'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('thread_summaries_thread_idx').on(t.threadId),
+    index('thread_summaries_hnsw_idx').using('hnsw', sql`${t.embedding} vector_cosine_ops`),
+  ],
+)
+
 export const knowledgeChunks = pgTable(
   'knowledge_chunks',
   {
@@ -139,3 +159,5 @@ export type MessageEmbedding = typeof messageEmbeddings.$inferSelect
 export type NewMessageEmbedding = typeof messageEmbeddings.$inferInsert
 export type KnowledgeChunk = typeof knowledgeChunks.$inferSelect
 export type NewKnowledgeChunk = typeof knowledgeChunks.$inferInsert
+export type ThreadSummary = typeof threadSummaries.$inferSelect
+export type NewThreadSummary = typeof threadSummaries.$inferInsert
