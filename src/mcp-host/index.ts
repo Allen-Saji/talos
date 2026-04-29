@@ -1,4 +1,11 @@
-import { TalosNotImplementedError } from '@/shared/errors'
+import type { Tool } from 'ai'
+import type { ToolSource } from '@/runtime/types'
+import type { McpHost } from './host'
+
+export { McpHost } from './host'
+export type { NamespacedToolEntry, ToolAnnotations } from './registry'
+export { flattenToolResult, namespaceToolName, parseToolAnnotations } from './registry'
+export { buildTransport } from './transports'
 
 export interface McpServerConfig {
   name: string
@@ -8,16 +15,13 @@ export interface McpServerConfig {
   url?: string
 }
 
-export class McpHost {
-  start(_servers: McpServerConfig[]): Promise<void> {
-    throw new TalosNotImplementedError('McpHost.start')
-  }
+/**
+ * ToolSource backed by an McpHost. Drops into RuntimeDeps.toolSources.
+ */
+export class McpToolSource implements ToolSource {
+  constructor(private readonly host: McpHost) {}
 
-  stop(): Promise<void> {
-    throw new TalosNotImplementedError('McpHost.stop')
-  }
-
-  listTools(): never {
-    throw new TalosNotImplementedError('McpHost.listTools')
+  async getTools(): Promise<Record<string, Tool>> {
+    return this.host.getToolRecord()
   }
 }
