@@ -23,6 +23,18 @@ const EnvSchema = z.object({
     (v) => (v === '' || v == null ? 'https://mcp.blockscout.com/mcp' : v),
     z.string().url(),
   ),
+  /** User-supplied EVM private key. If unset, daemon generates a burner persisted to paths.burnerWalletPath. */
+  EVM_PRIVATE_KEY: optionalNonEmpty,
+  /** Override the default public RPC for Sepolia (e.g. an Alchemy URL). */
+  RPC_URL_SEPOLIA: optionalUrl,
+  /** Override the default public RPC for Base Sepolia. */
+  RPC_URL_BASE_SEPOLIA: optionalUrl,
+  /** AgentKit 0x action provider — required for swap quote / execute calls. */
+  ZEROX_API_KEY: optionalNonEmpty,
+  /** AgentKit Zerion action provider — required for portfolio queries. */
+  ZERION_API_KEY: optionalNonEmpty,
+  /** AgentKit OpenSea action provider — required for NFT marketplace calls. */
+  OPENSEA_API_KEY: optionalNonEmpty,
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 
