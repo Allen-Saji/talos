@@ -48,6 +48,7 @@
     "@ai-sdk/mcp": "latest",
     "@ai-sdk/openai": "latest",
     "@electric-sql/pglite": "latest",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "ai": "latest",
     "commander": "latest",
     "dotenv": "latest",
