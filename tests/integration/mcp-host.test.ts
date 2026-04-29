@@ -21,6 +21,10 @@ describe('namespaceToolName', () => {
       'blockscout_get_token_balance',
     )
   })
+
+  it('handles server names containing underscores', () => {
+    expect(namespaceToolName('aave_v3', 'supply')).toBe('aave_v3_supply')
+  })
 })
 
 describe('parseToolAnnotations', () => {
@@ -85,9 +89,24 @@ describe('flattenToolResult', () => {
     expect(flattenToolResult(result)).toBe('hello world')
   })
 
-  it('parses JSON from single text content item', () => {
+  it('parses JSON object from single text content item', () => {
     const result = { content: [{ type: 'text', text: '{"balance":"100"}' }] }
     expect(flattenToolResult(result)).toEqual({ balance: '100' })
+  })
+
+  it('does not parse scalar JSON values (returns as text)', () => {
+    expect(flattenToolResult({ content: [{ type: 'text', text: '42' }] })).toBe('42')
+    expect(flattenToolResult({ content: [{ type: 'text', text: 'true' }] })).toBe('true')
+    expect(flattenToolResult({ content: [{ type: 'text', text: 'null' }] })).toBe('null')
+  })
+
+  it('does not parse JSON arrays (returns as text)', () => {
+    expect(flattenToolResult({ content: [{ type: 'text', text: '[1,2,3]' }] })).toBe('[1,2,3]')
+  })
+
+  it('returns text when JSON parse fails on object-shaped string', () => {
+    const result = { content: [{ type: 'text', text: '{not valid json' }] }
+    expect(flattenToolResult(result)).toBe('{not valid json')
   })
 
   it('joins multiple text items with newline', () => {
@@ -117,33 +136,40 @@ describe('flattenToolResult', () => {
 // McpHost integration tests (mocked MCP client)
 // ---------------------------------------------------------------------------
 
+type CreateMcpClientOpts = { onUncaughtError?: (err: unknown) => void }
+
 const { mockCreateMCPClient, MockStdioTransport } = vi.hoisted(() => {
-  const mockClose = vi.fn().mockResolvedValue(undefined)
-  const mockTools = vi.fn().mockResolvedValue({
-    supply: {
-      description: 'Supply tokens to Aave',
-      inputSchema: { type: 'object', properties: { amount: { type: 'string' } } },
-      execute: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: '{"tx":"0xabc"}' }] }),
-    },
-    borrow: {
-      description: 'Borrow from Aave',
-      inputSchema: { type: 'object', properties: { amount: { type: 'string' } } },
-      execute: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'borrowed' }] }),
-    },
-  })
-  const mockCreateMCPClient = vi.fn().mockResolvedValue({
-    tools: mockTools,
+  const defaultClient = {
+    tools: vi.fn().mockResolvedValue({
+      supply: {
+        description: 'Supply tokens to Aave',
+        inputSchema: { type: 'object', properties: { amount: { type: 'string' } } },
+        execute: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: '{"tx":"0xabc"}' }] }),
+      },
+      borrow: {
+        description: 'Borrow from Aave',
+        inputSchema: { type: 'object', properties: { amount: { type: 'string' } } },
+        execute: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'borrowed' }] }),
+      },
+    }),
     listTools: vi.fn().mockResolvedValue({ tools: [] }),
-    close: mockClose,
+    close: vi.fn().mockResolvedValue(undefined),
     serverInfo: { name: 'test-server', version: '1.0.0' },
-  })
+  }
+  const mockCreateMCPClient = vi.fn().mockResolvedValue(defaultClient)
   const MockStdioTransport = vi.fn().mockImplementation(() => ({
     start: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     send: vi.fn().mockResolvedValue(undefined),
   }))
-  return { mockClose, mockTools, mockCreateMCPClient, MockStdioTransport }
+  return { mockCreateMCPClient, MockStdioTransport }
 })
+
+/** Pull the onUncaughtError handler the host registered on its most recent createMCPClient call. */
+function lastOnUncaughtError(): ((err: unknown) => void) | undefined {
+  const calls = mockCreateMCPClient.mock.calls as Array<[CreateMcpClientOpts]>
+  return calls[calls.length - 1]?.[0]?.onUncaughtError
+}
 
 vi.mock('@ai-sdk/mcp', () => ({
   createMCPClient: mockCreateMCPClient,
@@ -189,6 +215,20 @@ describe('McpHost', () => {
     await host.stop()
   })
 
+  it('routes calls correctly when server name contains an underscore', async () => {
+    const host = new McpHost()
+    await host.start([{ name: 'aave_v3', transport: 'http', url: 'https://mcp.aave.com' }])
+
+    const record = host.getToolRecord()
+    expect(record).toHaveProperty('aave_v3_supply')
+    expect(record).toHaveProperty('aave_v3_borrow')
+
+    const result = await host.callTool('aave_v3_supply', { amount: '100' })
+    expect(result).toEqual({ tx: '0xabc' })
+
+    await host.stop()
+  })
+
   it('calls tool with namespaced name', async () => {
     const host = new McpHost()
     await host.start([{ name: 'aave', transport: 'http', url: 'https://mcp.aave.com' }])
@@ -199,22 +239,16 @@ describe('McpHost', () => {
     await host.stop()
   })
 
-  it('throws on unknown server', async () => {
+  it('throws when calling an unknown tool', async () => {
     const host = new McpHost()
     await host.start([{ name: 'aave', transport: 'http', url: 'https://mcp.aave.com' }])
 
     await expect(host.callTool('unknown_supply', {})).rejects.toThrow(
-      'unknown MCP server "unknown"',
+      'tool "unknown_supply" not found in any connected server',
     )
-
-    await host.stop()
-  })
-
-  it('throws on missing server prefix', async () => {
-    const host = new McpHost()
-    await host.start([{ name: 'aave', transport: 'http', url: 'https://mcp.aave.com' }])
-
-    await expect(host.callTool('supply', {})).rejects.toThrow('missing server prefix')
+    await expect(host.callTool('supply', {})).rejects.toThrow(
+      'tool "supply" not found in any connected server',
+    )
 
     await host.stop()
   })
@@ -230,11 +264,11 @@ describe('McpHost', () => {
     await host.stop()
   })
 
-  it('reports server health', async () => {
+  it('reports server health with retries and last error', async () => {
     const host = new McpHost()
     await host.start([{ name: 'aave', transport: 'http', url: 'https://mcp.aave.com' }])
 
-    expect(host.getServerHealth()).toEqual({ aave: true })
+    expect(host.getServerHealth()).toEqual({ aave: { healthy: true, retries: 0 } })
     expect(host.isServerHealthy('aave')).toBe(true)
     expect(host.isServerHealthy('nonexistent')).toBe(false)
 
@@ -248,6 +282,60 @@ describe('McpHost', () => {
     await host.stop()
     expect(host.listTools()).toHaveLength(0)
     expect(host.getServerHealth()).toEqual({})
+  })
+
+  it('flips healthy=false when onUncaughtError fires after connect', async () => {
+    const host = new McpHost()
+    await host.start([{ name: 'aave', transport: 'http', url: 'https://mcp.aave.com' }])
+    expect(host.isServerHealthy('aave')).toBe(true)
+
+    const handler = lastOnUncaughtError()
+    expect(handler).toBeDefined()
+    handler?.(new Error('connection dropped'))
+
+    expect(host.isServerHealthy('aave')).toBe(false)
+    const health = host.getServerHealth()
+    expect(health.aave?.healthy).toBe(false)
+    expect(health.aave?.lastError).toBe('connection dropped')
+
+    await host.stop()
+  })
+
+  it('aborts a tool call that exceeds the timeout', async () => {
+    mockCreateMCPClient.mockResolvedValueOnce({
+      tools: vi.fn().mockResolvedValue({
+        slow: {
+          description: 'slow tool',
+          execute: vi.fn(() => new Promise(() => {})),
+        },
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const host = new McpHost({ toolCallTimeoutMs: 50 })
+    await host.start([{ name: 'aave', transport: 'http', url: 'https://mcp.aave.com' }])
+
+    await expect(host.callTool('aave_slow', {})).rejects.toThrow(
+      'tool "aave_slow" timed out after 50ms',
+    )
+
+    await host.stop()
+  })
+
+  it('records retries and lastError when a server fails to connect', async () => {
+    mockCreateMCPClient.mockRejectedValueOnce(new Error('connect refused'))
+    mockCreateMCPClient.mockRejectedValueOnce(new Error('connect refused'))
+    mockCreateMCPClient.mockRejectedValueOnce(new Error('connect refused'))
+
+    const host = new McpHost({ maxAttempts: 3, baseDelayMs: 1 })
+    await expect(
+      host.start([{ name: 'aave', transport: 'http', url: 'https://mcp.aave.com' }]),
+    ).rejects.toThrow('all servers failed to connect')
+
+    const health = host.getServerHealth()
+    expect(health.aave?.healthy).toBe(false)
+    expect(health.aave?.retries).toBe(3)
+    expect(health.aave?.lastError).toBe('connect refused')
   })
 })
 

@@ -1,5 +1,5 @@
 import { createMCPClient, type MCPClient, type MCPTransport } from '@ai-sdk/mcp'
-import type { Tool } from 'ai'
+import type { ModelMessage, Tool } from 'ai'
 import { child } from '@/shared/logger'
 import type { McpServerConfig } from './index'
 import {
@@ -26,10 +26,36 @@ type ServerEntry = {
   tools: Map<string, NamespacedToolEntry>
   healthy: boolean
   retries: number
+  lastError?: string
 }
 
-const MAX_RETRIES = 3
-const BASE_DELAY_MS = 1000
+/** Health snapshot exposed via getServerHealth() */
+export type ServerHealth = {
+  healthy: boolean
+  retries: number
+  lastError?: string
+}
+
+/** Options for `callTool` ad-hoc invocations. */
+export type CallToolOptions = {
+  /** Conversation context for tools that need it. Defaults to []. */
+  messages?: ModelMessage[]
+  /** Override the host-level default timeout. */
+  timeoutMs?: number
+}
+
+export type McpHostOptions = {
+  /** Per tool-call timeout in ms. Default 30000. */
+  toolCallTimeoutMs?: number
+  /** Total connect attempts (1 initial + N-1 retries). Default 3. */
+  maxAttempts?: number
+  /** Base backoff between attempts; doubles each retry. Default 1000. */
+  baseDelayMs?: number
+}
+
+const DEFAULT_TOOL_CALL_TIMEOUT_MS = 30_000
+const DEFAULT_MAX_ATTEMPTS = 3
+const DEFAULT_BASE_DELAY_MS = 1000
 
 /**
  * McpHost — manages connections to N MCP servers and exposes their tools
@@ -37,12 +63,23 @@ const BASE_DELAY_MS = 1000
  */
 export class McpHost {
   private servers = new Map<string, ServerEntry>()
+  /** Reverse lookup: namespaced tool name → owning server entry. */
+  private toolIndex = new Map<string, ServerEntry>()
   private started = false
+  private readonly toolCallTimeoutMs: number
+  private readonly maxAttempts: number
+  private readonly baseDelayMs: number
+
+  constructor(opts: McpHostOptions = {}) {
+    this.toolCallTimeoutMs = opts.toolCallTimeoutMs ?? DEFAULT_TOOL_CALL_TIMEOUT_MS
+    this.maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS
+    this.baseDelayMs = opts.baseDelayMs ?? DEFAULT_BASE_DELAY_MS
+  }
 
   /**
    * Connect to all configured servers. Retries with exponential backoff
-   * on failure. Does not throw on individual server failures — logs and
-   * marks unhealthy.
+   * on failure. Throws only if every server fails; otherwise unhealthy
+   * servers are reported via `getServerHealth()`.
    */
   async start(configs: McpServerConfig[]): Promise<void> {
     if (this.started) {
@@ -93,6 +130,7 @@ export class McpHost {
     }
     await Promise.allSettled(closers)
     this.servers.clear()
+    this.toolIndex.clear()
     this.started = false
     log.info('McpHost stopped')
   }
@@ -123,45 +161,48 @@ export class McpHost {
   }
 
   /**
-   * Call a namespaced tool on the appropriate server.
-   * Tool name format: `${serverName}_${toolName}`
+   * Ad-hoc tool invocation by namespaced name. Looks up via the host's
+   * tool index, so server names containing underscores work correctly.
+   *
+   * NOTE: the runtime should obtain tools via `getToolRecord()` and let
+   * `streamText` invoke them with full conversation context. Use this
+   * method only for ad-hoc / admin invocations. Tools that depend on
+   * conversation context will receive whatever is passed via
+   * `opts.messages` (default `[]`).
    */
   async callTool(
     name: string,
     args: Record<string, unknown>,
+    opts: CallToolOptions = {},
   ): Promise<string | Record<string, unknown>> {
-    const underscoreIdx = name.indexOf('_')
-    if (underscoreIdx === -1) {
-      throw new Error(`tool name "${name}" missing server prefix (expected "server_tool")`)
+    const owner = this.toolIndex.get(name)
+    if (!owner) {
+      throw new Error(`tool "${name}" not found in any connected server`)
+    }
+    if (!owner.healthy || !owner.client) {
+      throw new Error(`MCP server "${owner.config.name}" is not connected`)
     }
 
-    const serverName = name.slice(0, underscoreIdx)
-    const toolName = name.slice(underscoreIdx + 1)
-
-    const entry = this.servers.get(serverName)
-    if (!entry) {
-      throw new Error(`unknown MCP server "${serverName}"`)
-    }
-    if (!entry.healthy || !entry.client) {
-      throw new Error(`MCP server "${serverName}" is not connected`)
-    }
-
-    const namespacedName = namespaceToolName(serverName, toolName)
-    const toolEntry = entry.tools.get(namespacedName)
+    const toolEntry = owner.tools.get(name)
     if (!toolEntry) {
-      throw new Error(`tool "${namespacedName}" not found on server "${serverName}"`)
+      throw new Error(`tool "${name}" missing from server "${owner.config.name}" registry`)
+    }
+    if (!toolEntry.tool.execute) {
+      throw new Error(`tool "${name}" has no execute function`)
     }
 
-    // AI SDK tool execution — call the tool's execute function
-    if (toolEntry.tool.execute) {
-      const result = await toolEntry.tool.execute(args, {
-        toolCallId: `${serverName}-${toolName}-${Date.now()}`,
-        messages: [],
-      })
-      return flattenToolResult(result)
-    }
+    const timeoutMs = opts.timeoutMs ?? this.toolCallTimeoutMs
+    const messages = opts.messages ?? []
 
-    throw new Error(`tool "${namespacedName}" has no execute function`)
+    const result = await this.withTimeout(
+      toolEntry.tool.execute(args, {
+        toolCallId: `${owner.config.name}-${toolEntry.originalName}-${Date.now()}`,
+        messages,
+      }),
+      timeoutMs,
+      `tool "${name}"`,
+    )
+    return flattenToolResult(result)
   }
 
   /**
@@ -172,17 +213,40 @@ export class McpHost {
   }
 
   /**
-   * Get health status of all servers.
+   * Get health status of all servers, including retry counts and last error.
    */
-  getServerHealth(): Record<string, boolean> {
-    const out: Record<string, boolean> = {}
+  getServerHealth(): Record<string, ServerHealth> {
+    const out: Record<string, ServerHealth> = {}
     for (const [name, entry] of this.servers) {
-      out[name] = entry.healthy
+      out[name] = {
+        healthy: entry.healthy,
+        retries: entry.retries,
+        ...(entry.lastError ? { lastError: entry.lastError } : {}),
+      }
     }
     return out
   }
 
   // --- internal ---
+
+  private async withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+    let timer: NodeJS.Timeout | undefined
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    })
+    try {
+      return await Promise.race([p, timeout])
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  }
+
+  private markUnhealthy(name: string, reason: string): void {
+    const entry = this.servers.get(name)
+    if (!entry) return
+    entry.healthy = false
+    entry.lastError = reason
+  }
 
   private async connectServer(name: string): Promise<void> {
     const entry = this.servers.get(name)
@@ -191,18 +255,18 @@ export class McpHost {
     const { config } = entry
     log.info({ server: name, transport: config.transport }, 'connecting to MCP server')
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       try {
         const transport = buildTransport(config)
         const client = await createMCPClient({
           transport: transport as MCPTransport | HttpTransportConfig,
           name: `talos-${config.name}`,
           onUncaughtError: (err) => {
-            log.error({ err, server: name }, 'uncaught MCP error')
+            log.error({ err, server: name }, 'uncaught MCP error — marking unhealthy')
+            this.markUnhealthy(name, err instanceof Error ? err.message : String(err))
           },
         })
 
-        // Fetch tools and namespace them
         const mcpTools = await client.tools()
         const toolMap = new Map<string, NamespacedToolEntry>()
 
@@ -210,37 +274,41 @@ export class McpHost {
           const namespaced = namespaceToolName(config.name, originalName)
           const annotations = parseToolAnnotations(tool as Record<string, unknown>)
 
-          toolMap.set(namespaced, {
+          const namespacedEntry: NamespacedToolEntry = {
             namespacedName: namespaced,
             originalName,
             serverName: config.name,
             annotations,
             tool: tool as Tool,
-          })
+          }
+          toolMap.set(namespaced, namespacedEntry)
+          this.toolIndex.set(namespaced, entry)
         }
 
         entry.client = client
         entry.tools = toolMap
         entry.healthy = true
         entry.retries = 0
+        entry.lastError = undefined
 
         log.info({ server: name, tools: toolMap.size }, 'MCP server connected')
         return
       } catch (err) {
-        entry.retries = attempt + 1
+        entry.retries = attempt
+        entry.lastError = err instanceof Error ? err.message : String(err)
 
-        if (attempt < MAX_RETRIES) {
-          const delay = BASE_DELAY_MS * 2 ** attempt
+        if (attempt < this.maxAttempts) {
+          const delay = this.baseDelayMs * 2 ** (attempt - 1)
           log.warn(
-            { err, server: name, attempt: attempt + 1, retryInMs: delay },
+            { err, server: name, attempt, retryInMs: delay },
             'MCP server connection failed, retrying',
           )
           await new Promise((r) => setTimeout(r, delay))
         } else {
           entry.healthy = false
           log.error(
-            { err, server: name, retries: MAX_RETRIES },
-            'MCP server connection failed after retries',
+            { err, server: name, attempts: this.maxAttempts },
+            'MCP server connection failed after all attempts',
           )
           throw err
         }
