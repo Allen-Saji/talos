@@ -16,7 +16,18 @@ import { createOpenAIEmbeddings } from '@/runtime/embeddings'
 import { createProviderRouter } from '@/runtime/providers'
 import { createRuntime } from '@/runtime/runtime'
 import { logger } from '@/shared/logger'
+import { createLifiToolSource } from '@/tools/lifi'
+import type { NativeToolSource } from '@/tools/native'
 import { type ControlPlane, createControlPlane } from './server'
+
+/**
+ * Build the list of in-process (Talos-owned) tool sources Talos boots with.
+ * Each source contributes pre-namespaced tools and self-declared
+ * annotations consulted by the KeeperHub middleware.
+ */
+function defaultNativeToolSources(): NativeToolSource[] {
+  return [createLifiToolSource()]
+}
 
 export type DaemonHandle = {
   /** Wait for shutdown — resolves on SIGTERM/SIGINT or explicit `stop()`. */
@@ -87,6 +98,15 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     }
   }
 
+  // In-process (native) tool sources contribute Talos-owned tools (Li.Fi,
+  // future custom Aave/Uniswap). Share the runtime's tool surface with the
+  // MCP host and provide their own annotations to the KeeperHub middleware.
+  // No spawn cost, no serialization round-trip.
+  const nativeSources: NativeToolSource[] = defaultNativeToolSources()
+  for (const src of nativeSources) {
+    logger.info({ source: src.name, tools: src.toolNames().length }, 'native tool source ready')
+  }
+
   // Build runtime deps. KH middleware / knowledge / summarizer / fact
   // pipeline are deferred to follow-up issues (#11/#16/#17 LLM impls).
   const agents = new AgentRegistry()
@@ -98,7 +118,7 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     providers,
     embeddings,
     agents,
-    toolSources: mcpHost ? [new McpToolSource(mcpHost)] : [],
+    toolSources: [...(mcpHost ? [new McpToolSource(mcpHost)] : []), ...nativeSources],
   })
 
   // Boot control plane.
