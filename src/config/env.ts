@@ -19,6 +19,10 @@ const EnvSchema = z.object({
   TALOS_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   TALOS_DATA_DIR: z.string().optional(),
   TALOS_CONFIG_DIR: z.string().optional(),
+  BLOCKSCOUT_MCP_URL: z.preprocess(
+    (v) => (v === '' || v == null ? 'https://mcp.blockscout.com/mcp' : v),
+    z.string().url(),
+  ),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 
