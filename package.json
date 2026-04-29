@@ -12,7 +12,7 @@
     "url": "git+https://github.com/Allen-Saji/talos.git"
   },
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=22"
   },
   "bin": {
     "talos": "./dist/bin/talos.js",
@@ -47,6 +47,8 @@
   "dependencies": {
     "@ai-sdk/mcp": "latest",
     "@ai-sdk/openai": "latest",
+    "@coinbase/agentkit": "^0.10.4",
+    "@coinbase/agentkit-vercel-ai-sdk": "^0.1.0",
     "@electric-sql/pglite": "latest",
     "@lifi/sdk": "^3.16.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -59,7 +61,8 @@
     "pino-pretty": "latest",
     "viem": "latest",
     "ws": "latest",
-    "zod": "latest"
+    "zod": "latest",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@biomejs/biome": "latest",

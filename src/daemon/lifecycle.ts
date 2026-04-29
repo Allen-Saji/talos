@@ -16,6 +16,7 @@ import { createOpenAIEmbeddings } from '@/runtime/embeddings'
 import { createProviderRouter } from '@/runtime/providers'
 import { createRuntime } from '@/runtime/runtime'
 import { logger } from '@/shared/logger'
+import { createAgentKitToolSource } from '@/tools/agentkit'
 import { createLifiToolSource } from '@/tools/lifi'
 import type { NativeToolSource } from '@/tools/native'
 import { type ControlPlane, createControlPlane } from './server'
@@ -24,9 +25,12 @@ import { type ControlPlane, createControlPlane } from './server'
  * Build the list of in-process (Talos-owned) tool sources Talos boots with.
  * Each source contributes pre-namespaced tools and self-declared
  * annotations consulted by the KeeperHub middleware.
+ *
+ * AgentKit init is async (it awaits action-provider registration); other
+ * sources construct synchronously.
  */
-function defaultNativeToolSources(): NativeToolSource[] {
-  return [createLifiToolSource()]
+async function defaultNativeToolSources(): Promise<NativeToolSource[]> {
+  return [createLifiToolSource(), await createAgentKitToolSource()]
 }
 
 export type DaemonHandle = {
@@ -99,10 +103,10 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
   }
 
   // In-process (native) tool sources contribute Talos-owned tools (Li.Fi,
-  // future custom Aave/Uniswap). Share the runtime's tool surface with the
-  // MCP host and provide their own annotations to the KeeperHub middleware.
-  // No spawn cost, no serialization round-trip.
-  const nativeSources: NativeToolSource[] = defaultNativeToolSources()
+  // AgentKit cherry-pick, future custom Aave/Uniswap). Share the runtime's
+  // tool surface with the MCP host and provide their own annotations to the
+  // KeeperHub middleware. No spawn cost, no serialization round-trip.
+  const nativeSources: NativeToolSource[] = await defaultNativeToolSources()
   for (const src of nativeSources) {
     logger.info({ source: src.name, tools: src.toolNames().length }, 'native tool source ready')
   }

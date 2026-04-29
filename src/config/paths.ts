@@ -18,6 +18,7 @@ export const paths = {
   channelsConfigPath: path.join(configDir, 'channels.yaml'),
   logPath: path.join(dataDir, 'talos.log'),
   keeperhubTokenPath: path.join(configDir, 'keeperhub.token'),
+  burnerWalletPath: path.join(configDir, 'burner.json'),
 } as const
 
 export type Paths = typeof paths
