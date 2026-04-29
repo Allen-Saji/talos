@@ -1,5 +1,8 @@
 #!/usr/bin/env node
+import fs from 'node:fs'
 import { Command } from 'commander'
+import { paths } from '@/config/paths'
+import { assertNoLiveDaemon, createDb, runMigrations } from '@/persistence'
 import { TalosNotImplementedError } from '@/shared/errors'
 import { logger } from '@/shared/logger'
 
@@ -42,9 +45,16 @@ program
 program
   .command('migrate')
   .description('Run database migrations against the local PGLite store')
-  .action(() => {
-    logger.info('migrate: not implemented')
-    throw new TalosNotImplementedError('talos migrate')
+  .action(async () => {
+    assertNoLiveDaemon()
+    fs.mkdirSync(paths.dataDir, { recursive: true })
+    const handle = await createDb({ path: paths.dbPath })
+    try {
+      await runMigrations(handle)
+      logger.info({ dbPath: paths.dbPath }, 'migrations applied')
+    } finally {
+      await handle.close()
+    }
   })
 
 program.parseAsync().catch((err) => {

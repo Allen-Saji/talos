@@ -37,3 +37,10 @@ export class TalosProtocolError extends TalosError {
     this.name = 'TalosProtocolError'
   }
 }
+
+export class TalosDbError extends TalosError {
+  constructor(message: string, code = 'DB_ERROR', cause?: unknown) {
+    super(message, code, cause)
+    this.name = 'TalosDbError'
+  }
+}
