@@ -397,6 +397,57 @@ describe('runtime — tool calling', () => {
     expect(Number(steps.rows[0]?.count ?? '0')).toBeGreaterThanOrEqual(2)
   })
 
+  it('backfills tool_calls.step_id to the step that produced the call', async () => {
+    const flow = toolCallThenTextChunks({
+      toolName: 'getBalance',
+      toolCallId: 'call_step_id',
+      input: { wallet: '0xABC' },
+      finalText: 'You have 5 ETH.',
+    })
+    const model = makeMockModel([flow.step1, flow.step2])
+
+    const balanceTool = tool({
+      description: 'Get wallet balance',
+      inputSchema: z.object({ wallet: z.string() }),
+      execute: async ({ wallet }) => ({ wallet, balance: '5 ETH' }),
+    })
+    const toolSource: ToolSource = { getTools: async () => ({ getBalance: balanceTool }) }
+
+    const toolMiddleware = (ctx: RunContext): ToolMiddleware =>
+      createKeeperHubMiddleware({ db: handle.db, runContext: () => ctx })
+
+    const runtime = createRuntime({
+      db: handle,
+      providers: singleModelRouter(model),
+      embeddings: deterministicEmbeddings(),
+      agents: withRegistry(),
+      toolSources: [toolSource],
+      toolMiddleware,
+      config: { maxSteps: 3 },
+    })
+
+    const r = await runtime.run({
+      threadId: 't-step-id',
+      channel: 'cli',
+      intent: 'check balance',
+    })
+    await drain(r)
+
+    const tcalls = await handle.pg.query<{ tool_call_id: string; step_id: string | null }>(
+      `SELECT tool_call_id, step_id FROM tool_calls WHERE run_id = $1`,
+      [r.runId],
+    )
+    expect(tcalls.rows.length).toBe(1)
+    const tcStepId = tcalls.rows[0]?.step_id
+    expect(tcStepId).not.toBeNull()
+
+    const stepRow = await handle.pg.query<{ id: string }>(
+      `SELECT id FROM steps WHERE run_id = $1 AND step_index = 0`,
+      [r.runId],
+    )
+    expect(stepRow.rows[0]?.id).toBe(tcStepId)
+  })
+
   it('records error and shouldAudit reason when tool throws', async () => {
     const flow = toolCallThenTextChunks({
       toolName: 'aave_supply',

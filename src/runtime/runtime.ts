@@ -13,6 +13,7 @@ import {
   closeRun,
   insertMessageEmbedding,
   openRun,
+  updateToolCallStepIds,
   upsertThread,
   writeThreadSummary,
 } from '@/persistence/queries'
@@ -211,10 +212,12 @@ async function persistStep(
   event: OnStepFinishEvent<ToolSet>,
 ): Promise<void> {
   // The KeeperHub middleware is the single writer of `tool_calls` rows (with
-  // audit metadata). `persistStep` only writes the step row — the
-  // `tool_calls` jsonb summary on the step keeps step-level reasoning even
-  // when middleware is absent.
-  await appendStep(db.db, {
+  // audit metadata). `persistStep` writes the step row + backfills `step_id`
+  // on audit rows already inserted by the middleware (it fires at tool
+  // execute time, before this step row exists, so it writes step_id = null).
+  // The `tool_calls` jsonb summary on the step keeps step-level reasoning
+  // even when middleware is absent.
+  const stepRow = await appendStep(db.db, {
     runId,
     stepIndex,
     role: 'assistant',
@@ -222,6 +225,15 @@ async function persistStep(
     toolCalls: event.toolCalls.length > 0 ? event.toolCalls.map(toolCallShape) : null,
     finishReason: event.finishReason,
   })
+
+  if (event.toolCalls.length > 0) {
+    await updateToolCallStepIds(
+      db.db,
+      runId,
+      event.toolCalls.map((c) => c.toolCallId),
+      stepRow.id,
+    )
+  }
 }
 
 function toolCallShape(call: { toolCallId: string; toolName: string; input: unknown }) {
