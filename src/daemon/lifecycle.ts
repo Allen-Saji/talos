@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import { loadEnv, resetEnvCache } from '@/config/env'
 import { paths } from '@/config/paths'
 import { ensureToken } from '@/config/token'
-import { defaultMcpServers, McpHost, McpToolSource } from '@/mcp-host'
+import { type AnnotationLookup, createKeeperHubMiddleware, type ToolMiddleware } from '@/keeperhub'
+import { defaultMcpServers, McpHost, McpToolSource, type ToolAnnotations } from '@/mcp-host'
 import {
   assertNoLiveDaemon,
   createDb,
@@ -15,6 +16,7 @@ import { AgentRegistry, TALOS_ETH_AGENT } from '@/runtime/agents'
 import { createOpenAIEmbeddings } from '@/runtime/embeddings'
 import { createProviderRouter } from '@/runtime/providers'
 import { createRuntime } from '@/runtime/runtime'
+import type { RunContext } from '@/runtime/types'
 import { logger } from '@/shared/logger'
 import { createAgentKitToolSource } from '@/tools/agentkit'
 import { createLifiToolSource } from '@/tools/lifi'
@@ -111,8 +113,34 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     logger.info({ source: src.name, tools: src.toolNames().length }, 'native tool source ready')
   }
 
-  // Build runtime deps. KH middleware / knowledge / summarizer / fact
-  // pipeline are deferred to follow-up issues (#11/#16/#17 LLM impls).
+  // Annotation lookup feeds the KeeperHub `shouldAudit` policy. Native sources
+  // declare their own annotations; the MCP host carries parsed + override-merged
+  // annotations on its tool index. Native takes priority on collision (matches
+  // `mergeToolSources` ordering).
+  const annotationLookup: AnnotationLookup = (name) => {
+    for (const src of nativeSources) {
+      const a = src.annotations(name)
+      if (a) return a
+    }
+    if (mcpHost) {
+      const entry = mcpHost.listTools().find((t) => t.namespacedName === name)
+      if (entry) return entry.annotations as ToolAnnotations
+    }
+    return undefined
+  }
+
+  // Per-run middleware factory. Bound at boot to db + annotation lookup; the
+  // runtime calls it per run with the runId so audit rows carry the right
+  // run context. Single writer for `tool_calls` (persistStep no longer inserts).
+  const toolMiddleware = (ctx: RunContext): ToolMiddleware =>
+    createKeeperHubMiddleware({
+      db: dbHandle.db,
+      runContext: () => ctx,
+      annotations: annotationLookup,
+    })
+
+  // Build runtime deps. Knowledge / summarizer / fact pipeline are deferred
+  // to follow-up issues (#11/#16/#17 LLM impls).
   const agents = new AgentRegistry()
   agents.register(TALOS_ETH_AGENT, { default: true })
   const providers = createProviderRouter()
@@ -123,6 +151,7 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     embeddings,
     agents,
     toolSources: [...(mcpHost ? [new McpToolSource(mcpHost)] : []), ...nativeSources],
+    toolMiddleware,
   })
 
   // Boot control plane.

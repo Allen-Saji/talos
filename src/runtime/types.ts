@@ -32,6 +32,28 @@ export interface ToolSource {
   getTools(): Promise<Record<string, Tool>>
 }
 
+// ---------- tool middleware ----------
+
+/** Per-call run context the runtime threads through to middleware. */
+export type RunContext = {
+  runId: string
+  stepId?: string | null
+}
+
+/**
+ * Wraps a record of tools, returning a record with the same keys. Implementations
+ * may intercept `execute`, replace behavior, or just observe. The KeeperHub
+ * middleware is the production implementation; tests may pass identity functions.
+ */
+export type ToolMiddleware = (tools: Record<string, Tool>) => Record<string, Tool>
+
+/**
+ * Per-run middleware factory. The daemon constructs this once at boot bound to
+ * the DB and annotation lookup; the runtime calls it per run with the run's id
+ * so audit rows carry the right runId without AsyncLocalStorage gymnastics.
+ */
+export type ToolMiddlewareFactory = (ctx: RunContext) => ToolMiddleware
+
 // ---------- knowledge layer (from #11) ----------
 
 export type KnowledgeChunkHit = {

@@ -13,7 +13,7 @@ import {
   closeRun,
   insertMessageEmbedding,
   openRun,
-  recordToolCall,
+  updateToolCallStepIds,
   upsertThread,
   writeThreadSummary,
 } from '@/persistence/queries'
@@ -32,6 +32,7 @@ import type {
   RunOptions,
   RuntimeConfig,
   ThreadSummarizer,
+  ToolMiddlewareFactory,
   ToolSource,
 } from './types'
 
@@ -45,6 +46,12 @@ export type RuntimeDeps = {
   embeddings: EmbeddingsService
   agents: AgentRegistry
   toolSources?: readonly ToolSource[]
+  /**
+   * Per-run middleware factory (KeeperHub audit-by-default in production).
+   * Called once per run after `openRun` so the middleware has the runId. When
+   * unset, tools pass through unwrapped and `tool_calls` rows are not written.
+   */
+  toolMiddleware?: ToolMiddlewareFactory
   knowledgeRetriever?: KnowledgeRetriever
   factPipeline?: FactPipeline
   summarizer?: ThreadSummarizer
@@ -98,14 +105,15 @@ export function createRuntime(deps: RuntimeDeps): AgentRuntime {
         knowledge.retrieve(opts.intent, { topK: cfg.knowledgeTopK }),
       ])
 
-      // 4. Mount tools + assemble system prompt.
-      const tools = await mergeToolSources(toolSources)
+      // 4. Mount tools + assemble system prompt. Names stay the same after
+      //    middleware wrapping, so the prompt can be built before the wrap.
+      const rawTools = await mergeToolSources(toolSources)
       const system = buildSystemPrompt({
         persona: agent.persona,
         warmSummary,
         coldRecallSummaries: coldSummaries,
         knowledgeChunks,
-        toolNames: Object.keys(tools),
+        toolNames: Object.keys(rawTools),
       })
 
       // 5. Open run row (status = 'running').
@@ -116,6 +124,12 @@ export function createRuntime(deps: RuntimeDeps): AgentRuntime {
       const runId = runRow.id
 
       log.info({ runId }, 'run opened')
+
+      // 5b. Apply tool middleware now that runId exists. The middleware writes
+      //     `tool_calls` audit rows (KeeperHub policy) so this is the single
+      //     writer — `persistStep` no longer inserts into `tool_calls`. When
+      //     unset, tools pass through and the table stays empty for this run.
+      const tools = deps.toolMiddleware ? deps.toolMiddleware({ runId })(rawTools) : rawTools
 
       // 6. Build messages for the model: hot tier + new user message.
       const messages: ModelMessage[] = [...hotMessages, { role: 'user', content: opts.intent }]
@@ -197,6 +211,12 @@ async function persistStep(
   stepIndex: number,
   event: OnStepFinishEvent<ToolSet>,
 ): Promise<void> {
+  // The KeeperHub middleware is the single writer of `tool_calls` rows (with
+  // audit metadata). `persistStep` writes the step row + backfills `step_id`
+  // on audit rows already inserted by the middleware (it fires at tool
+  // execute time, before this step row exists, so it writes step_id = null).
+  // The `tool_calls` jsonb summary on the step keeps step-level reasoning
+  // even when middleware is absent.
   const stepRow = await appendStep(db.db, {
     runId,
     stepIndex,
@@ -206,21 +226,13 @@ async function persistStep(
     finishReason: event.finishReason,
   })
 
-  if (event.toolCalls.length === 0) return
-
-  // Match toolResults to their toolCalls by toolCallId.
-  const resultByCallId = new Map(event.toolResults.map((r) => [r.toolCallId, r]))
-  for (const call of event.toolCalls) {
-    const result = resultByCallId.get(call.toolCallId)
-    await recordToolCall(db.db, {
+  if (event.toolCalls.length > 0) {
+    await updateToolCallStepIds(
+      db.db,
       runId,
-      stepId: stepRow.id,
-      toolCallId: call.toolCallId,
-      toolName: call.toolName,
-      args: call.input as Record<string, unknown>,
-      result: result?.output as Record<string, unknown> | null,
-      error: null,
-    })
+      event.toolCalls.map((c) => c.toolCallId),
+      stepRow.id,
+    )
   }
 }
 

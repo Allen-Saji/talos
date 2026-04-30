@@ -69,6 +69,31 @@ export async function recordToolCall(db: Db, input: NewToolCall) {
   return row
 }
 
+/**
+ * Backfill `step_id` on audit rows already inserted by the KeeperHub
+ * middleware. The middleware fires at tool execute time — before the step row
+ * exists — so it writes `step_id = null` and the runtime UPDATEs after
+ * `appendStep` returns. Scoped by `run_id + tool_call_id` so concurrent runs
+ * never cross-contaminate.
+ */
+export async function updateToolCallStepIds(
+  db: Db,
+  runId: string,
+  toolCallIds: readonly string[],
+  stepId: string,
+): Promise<void> {
+  if (toolCallIds.length === 0) return
+  await db
+    .update(toolCalls)
+    .set({ stepId })
+    .where(
+      sql`${toolCalls.runId} = ${runId} AND ${toolCalls.toolCallId} IN (${sql.join(
+        toolCallIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`,
+    )
+}
+
 export type ToolAuditMeta = {
   /** True if KeeperHub middleware would route this through workflow audit. */
   shouldAudit: boolean
