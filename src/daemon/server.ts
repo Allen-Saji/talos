@@ -14,6 +14,27 @@ const log = child({ module: 'daemon-server' })
 
 const DEFAULT_HOST = '127.0.0.1'
 
+/**
+ * Optional knowledge controller: when present, the control plane handles
+ * `knowledge-refresh` frames by invoking `refresh()` and replying with a
+ * `knowledge-refresh-done` frame. When absent, refresh requests get an
+ * `error` frame with code `KNOWLEDGE_DISABLED`.
+ */
+export type KnowledgeController = {
+  refresh(): Promise<{
+    startedAt: string
+    finishedAt: string
+    totalDurationMs: number
+    sources: Array<{
+      source: string
+      fetched: number
+      chunks: number
+      durationMs: number
+      error?: string
+    }>
+  }>
+}
+
 export type ControlPlaneOpts = {
   runtime: AgentRuntime
   /** Bearer token clients must present in the auth frame. */
@@ -24,6 +45,8 @@ export type ControlPlaneOpts = {
   host?: string
   /** Default channel id reported to the runtime when a client doesn't supply one. */
   defaultChannel?: string
+  /** Optional knowledge controller; required to handle `knowledge-refresh` frames. */
+  knowledge?: KnowledgeController
 }
 
 export type ControlPlane = {
@@ -137,6 +160,46 @@ export function createControlPlane(opts: ControlPlaneOpts): ControlPlane {
       ac.abort()
       return
     }
+
+    if (frame.type === 'knowledge-refresh') {
+      await handleKnowledgeRefresh(conn, frame.requestId)
+      return
+    }
+  }
+
+  async function handleKnowledgeRefresh(conn: Connection, requestId: string): Promise<void> {
+    if (!opts.knowledge) {
+      sendRequestError(conn, 'KNOWLEDGE_DISABLED', 'knowledge controller not wired', requestId)
+      return
+    }
+    const task = (async () => {
+      try {
+        const report = await opts.knowledge!.refresh()
+        send(conn, {
+          type: 'knowledge-refresh-done',
+          requestId,
+          startedAt: report.startedAt,
+          finishedAt: report.finishedAt,
+          totalDurationMs: report.totalDurationMs,
+          sources: report.sources.map((s) => ({
+            source: s.source,
+            fetched: s.fetched,
+            chunks: s.chunks,
+            durationMs: s.durationMs,
+            ...(s.error ? { error: s.error } : {}),
+          })),
+        })
+      } catch (err) {
+        sendRequestError(
+          conn,
+          'KNOWLEDGE_REFRESH_FAILED',
+          err instanceof Error ? err.message : String(err),
+          requestId,
+        )
+      }
+    })()
+    conn.pending.add(task)
+    task.finally(() => conn.pending.delete(task))
   }
 
   async function startRun(
@@ -189,6 +252,15 @@ export function createControlPlane(opts: ControlPlaneOpts): ControlPlane {
 
   function sendError(conn: Connection, code: string, message: string, runId?: string): void {
     send(conn, runId ? { type: 'error', code, message, runId } : { type: 'error', code, message })
+  }
+
+  function sendRequestError(
+    conn: Connection,
+    code: string,
+    message: string,
+    requestId: string,
+  ): void {
+    send(conn, { type: 'error', code, message, requestId })
   }
 
   return {

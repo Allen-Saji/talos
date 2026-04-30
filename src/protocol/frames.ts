@@ -29,11 +29,19 @@ export const RunCancelFrame = z.object({
 })
 export type RunCancelFrame = z.infer<typeof RunCancelFrame>
 
+export const KnowledgeRefreshFrame = z.object({
+  type: z.literal('knowledge-refresh'),
+  /** Echoed back on the result frame so callers can correlate. */
+  requestId: z.string().min(1),
+})
+export type KnowledgeRefreshFrame = z.infer<typeof KnowledgeRefreshFrame>
+
 export const ClientFrame = z.discriminatedUnion('type', [
   HelloFrame,
   AuthFrame,
   RunStartFrame,
   RunCancelFrame,
+  KnowledgeRefreshFrame,
 ])
 export type ClientFrame = z.infer<typeof ClientFrame>
 
@@ -69,13 +77,35 @@ export const ErrorFrame = z.object({
   code: z.string(),
   message: z.string(),
   runId: z.string().optional(),
+  /** Set when the error was raised in response to a non-run request (e.g. knowledge-refresh). */
+  requestId: z.string().optional(),
 })
 export type ErrorFrame = z.infer<typeof ErrorFrame>
+
+export const KnowledgeSourceReportFrame = z.object({
+  source: z.string(),
+  fetched: z.number().int().nonnegative(),
+  chunks: z.number().int().nonnegative(),
+  durationMs: z.number().int().nonnegative(),
+  error: z.string().optional(),
+})
+export type KnowledgeSourceReportFrame = z.infer<typeof KnowledgeSourceReportFrame>
+
+export const KnowledgeRefreshDoneFrame = z.object({
+  type: z.literal('knowledge-refresh-done'),
+  requestId: z.string(),
+  startedAt: z.string(),
+  finishedAt: z.string(),
+  totalDurationMs: z.number().int().nonnegative(),
+  sources: z.array(KnowledgeSourceReportFrame),
+})
+export type KnowledgeRefreshDoneFrame = z.infer<typeof KnowledgeRefreshDoneFrame>
 
 export const ServerFrame = z.discriminatedUnion('type', [
   HelloAckFrame,
   RunEventFrame,
   RunDoneFrame,
+  KnowledgeRefreshDoneFrame,
   ErrorFrame,
 ])
 export type ServerFrame = z.infer<typeof ServerFrame>

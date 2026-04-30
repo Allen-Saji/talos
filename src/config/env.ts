@@ -35,6 +35,16 @@ const EnvSchema = z.object({
   ZERION_API_KEY: optionalNonEmpty,
   /** AgentKit OpenSea action provider — required for NFT marketplace calls. */
   OPENSEA_API_KEY: optionalNonEmpty,
+  /** Knowledge cron interval, ms. Default 24h. */
+  KNOWLEDGE_CRON_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(24 * 60 * 60 * 1000),
+  /** Disable the knowledge cron entirely (tests, dev). */
+  KNOWLEDGE_CRON_DISABLE: z.coerce.boolean().default(false),
+  /** Run the knowledge cron once at boot — used by `talos init`'s sync first-fetch. */
+  KNOWLEDGE_CRON_RUN_ON_BOOT: z.coerce.boolean().default(false),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 

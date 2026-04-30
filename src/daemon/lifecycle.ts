@@ -12,6 +12,10 @@ import {
   type MutateRoute,
   type ToolMiddleware,
 } from '@/keeperhub'
+import { runKnowledgeCron } from '@/knowledge/cron'
+import { createKnowledgeRetriever } from '@/knowledge/retrieve'
+import { type SchedulerHandle, startScheduler } from '@/knowledge/scheduler'
+import { defaultKnowledgeSources } from '@/knowledge/sources'
 import { defaultMcpServers, McpHost, McpToolSource, type ToolAnnotations } from '@/mcp-host'
 import {
   assertNoLiveDaemon,
@@ -198,12 +202,24 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
       ...(khClient ? { kh: { client: khClient, routes } } : {}),
     })
 
-  // Build runtime deps. Knowledge / summarizer / fact pipeline are deferred
-  // to follow-up issues (#11/#16/#17 LLM impls).
+  // Build runtime deps. Summarizer / fact pipeline still deferred (#16/#17).
+  // Knowledge retriever + cron land in #11.
   const agents = new AgentRegistry()
   agents.register(TALOS_ETH_AGENT, { default: true })
   const providers = createProviderRouter()
   const embeddings = createOpenAIEmbeddings()
+  const knowledgeSources = defaultKnowledgeSources()
+  const knowledgeRetriever = createKnowledgeRetriever({ db: dbHandle.db, embeddings })
+  const knowledgeController = {
+    refresh: () =>
+      runKnowledgeCron({
+        db: dbHandle.db,
+        embeddings,
+        sources: knowledgeSources,
+        logger,
+      }),
+  }
+
   const runtime = createRuntime({
     db: dbHandle,
     providers,
@@ -211,7 +227,36 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     agents,
     toolSources: [...(mcpHost ? [new McpToolSource(mcpHost)] : []), ...nativeSources],
     toolMiddleware,
+    knowledgeRetriever,
   })
+
+  // Boot the knowledge scheduler if not disabled. Skips entirely when
+  // OPENAI_API_KEY is missing — cron ticks would crash at the embedding call
+  // and a daily warn-storm helps no one. Manual `talos knowledge:refresh`
+  // still works once the key is set.
+  let knowledgeScheduler: SchedulerHandle | undefined
+  if (!env.KNOWLEDGE_CRON_DISABLE && env.OPENAI_API_KEY) {
+    knowledgeScheduler = startScheduler({
+      run: () => knowledgeController.refresh(),
+      intervalMs: env.KNOWLEDGE_CRON_INTERVAL_MS,
+      runOnBoot: env.KNOWLEDGE_CRON_RUN_ON_BOOT,
+      logger,
+      name: 'knowledge',
+    })
+    logger.info(
+      {
+        intervalMs: env.KNOWLEDGE_CRON_INTERVAL_MS,
+        runOnBoot: env.KNOWLEDGE_CRON_RUN_ON_BOOT,
+        sources: knowledgeSources.length,
+      },
+      'knowledge cron scheduled',
+    )
+  } else {
+    logger.info(
+      { disabled: env.KNOWLEDGE_CRON_DISABLE, hasKey: Boolean(env.OPENAI_API_KEY) },
+      'knowledge cron not started (disabled or OPENAI_API_KEY missing)',
+    )
+  }
 
   // Boot control plane.
   const controlPlane = createControlPlane({
@@ -219,6 +264,7 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     token,
     port: startOpts.port ?? env.TALOS_DAEMON_PORT,
     ...(startOpts.host !== undefined ? { host: startOpts.host } : {}),
+    knowledge: knowledgeController,
   })
   const { port, host } = await controlPlane.start()
 
@@ -244,6 +290,13 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     if (stopping) return stopping
     stopping = (async () => {
       logger.info('talosd shutting down')
+      if (knowledgeScheduler) {
+        try {
+          await knowledgeScheduler.stop()
+        } catch (err) {
+          logger.warn({ err }, 'error stopping knowledge scheduler')
+        }
+      }
       try {
         await controlPlane.stop()
       } catch (err) {
