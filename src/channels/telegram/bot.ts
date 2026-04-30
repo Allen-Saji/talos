@@ -171,8 +171,30 @@ export function createTelegramBot(opts: TelegramBotOpts): TelegramBotHandle {
       if (running) return
       running = true
       log.info('telegram bot starting (long-poll)')
-      await bot.start({
-        onStart: () => log.info('telegram bot connected'),
+      // grammY's bot.start() returns a long-running promise that only resolves
+      // when polling stops (via bot.stop()). Resolving our start() on that
+      // would mean "start completes when the bot ends" — wrong shape. Instead
+      // we resolve once polling is actually up (via the onStart callback) and
+      // let the long-running promise continue in the background, surfacing
+      // mid-flight failures via logs. Pre-onStart errors (bad token, network
+      // unreachable) propagate to the caller normally.
+      await new Promise<void>((resolve, reject) => {
+        let started = false
+        bot
+          .start({
+            onStart: () => {
+              started = true
+              log.info('telegram bot connected')
+              resolve()
+            },
+          })
+          .catch((err) => {
+            if (started) {
+              log.warn({ err }, 'telegram bot polling errored after start')
+            } else {
+              reject(err)
+            }
+          })
       })
     },
     async stop(): Promise<void> {
