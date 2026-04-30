@@ -244,10 +244,17 @@ export function createControlPlane(opts: ControlPlaneOpts): ControlPlane {
   function send(conn: Connection, frame: ServerFrame): void {
     if (conn.ws.readyState !== WebSocket.OPEN) return
     try {
-      conn.ws.send(JSON.stringify(frame))
+      conn.ws.send(JSON.stringify(frame, bigintSafeReplacer))
     } catch (err) {
       log.warn({ err }, 'failed to send frame')
     }
+  }
+
+  function bigintSafeReplacer(_key: string, value: unknown): unknown {
+    // Viem and AI SDK can leak BigInt into tool-result/tool-error payloads
+    // (gas estimates, balances inside error metadata). JSON.stringify defaults
+    // to throwing on BigInt — coerce to decimal string at the boundary.
+    return typeof value === 'bigint' ? value.toString() : value
   }
 
   function sendError(conn: Connection, code: string, message: string, runId?: string): void {
