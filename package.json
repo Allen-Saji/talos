@@ -52,7 +52,7 @@
     "@electric-sql/pglite": "latest",
     "@lifi/sdk": "^3.16.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "ai": "latest",
+    "ai": "^6.0.0",
     "commander": "latest",
     "dotenv": "latest",
     "drizzle-orm": "latest",
