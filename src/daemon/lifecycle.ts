@@ -1,6 +1,12 @@
 import fs from 'node:fs'
 import { createPublicClient, http } from 'viem'
 import { sepolia } from 'viem/chains'
+import {
+  createTelegramBot,
+  loadChannelsConfig,
+  resolveBotToken,
+  type TelegramBotHandle,
+} from '@/channels'
 import { loadEnv, resetEnvCache } from '@/config/env'
 import { paths } from '@/config/paths'
 import { ensureToken } from '@/config/token'
@@ -203,7 +209,6 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     })
 
   // Build runtime deps. Summarizer / fact pipeline still deferred (#16/#17).
-  // Knowledge retriever + cron land in #11.
   const agents = new AgentRegistry()
   agents.register(TALOS_ETH_AGENT, { default: true })
   const providers = createProviderRouter()
@@ -268,6 +273,28 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
   })
   const { port, host } = await controlPlane.start()
 
+  // Boot Telegram channel if enabled in channels.yaml and token is present.
+  const channelsConfig = loadChannelsConfig()
+  let telegramBot: TelegramBotHandle | null = null
+  if (channelsConfig.channels.telegram.enabled) {
+    const botToken =
+      resolveBotToken(channelsConfig.channels.telegram.bot_token_ref) ?? env.TELEGRAM_BOT_TOKEN
+    if (botToken) {
+      telegramBot = createTelegramBot({
+        token: botToken,
+        config: channelsConfig.channels.telegram,
+        runtime,
+      })
+      telegramBot.start().catch((err) => {
+        logger.warn({ err }, 'telegram bot failed to start')
+      })
+    } else {
+      logger.warn(
+        'telegram channel enabled but no bot token — set bot_token_ref or TELEGRAM_BOT_TOKEN',
+      )
+    }
+  }
+
   // Write the PID file only after we've successfully bound — avoids leaking
   // a stale PID if start fails.
   writePidFile()
@@ -290,6 +317,13 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     if (stopping) return stopping
     stopping = (async () => {
       logger.info('talosd shutting down')
+      if (telegramBot) {
+        try {
+          await telegramBot.stop()
+        } catch (err) {
+          logger.warn({ err }, 'error stopping telegram bot')
+        }
+      }
       if (knowledgeScheduler) {
         try {
           await knowledgeScheduler.stop()

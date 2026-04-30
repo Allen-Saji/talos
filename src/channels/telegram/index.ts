@@ -1,5 +1,12 @@
-import { TalosNotImplementedError } from '@/shared/errors'
-
-export function startTelegramChannel(): never {
-  throw new TalosNotImplementedError('channels.telegram.startTelegramChannel')
-}
+export {
+  createTelegramBot,
+  type TelegramBotHandle,
+  type TelegramBotOpts,
+} from './bot'
+export {
+  type ChannelsConfig,
+  loadChannelsConfig,
+  resetChannelsConfigCache,
+  resolveBotToken,
+  type TelegramChannelConfig,
+} from './config'

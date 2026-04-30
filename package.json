@@ -62,6 +62,7 @@
     "pino-pretty": "latest",
     "viem": "latest",
     "ws": "latest",
+    "yaml": "^2.8.3",
     "zod": "latest",
     "zod-to-json-schema": "^3.25.2"
   },
