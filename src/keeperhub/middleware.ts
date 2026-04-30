@@ -54,11 +54,12 @@ export type AnnotationLookup = (toolName: string) => ToolAnnotations | undefined
 /**
  * Maps a mutate tool's incoming args to a KeeperHub contract-call payload.
  * Implementations live with each protocol tool (e.g. `aave_supply` provides
- * its own route that builds the `Pool.supply` call). Returning the payload
- * is the only contract — when no route is registered for a mutate tool, the
- * middleware falls through to the original `execute`.
+ * its own route that builds the `Pool.supply` call). May be sync or async —
+ * async lets the route fetch fresh chain state (quotes, allowances) before
+ * encoding. When no route is registered for a mutate tool, the middleware
+ * falls through to the original `execute`.
  */
-export type MutateRoute = (args: unknown) => ContractCallInput
+export type MutateRoute = (args: unknown) => ContractCallInput | Promise<ContractCallInput>
 
 export type KeeperHubMiddlewareDeps = {
   db: Db
@@ -134,7 +135,7 @@ function wrapTool(name: string, original: Tool, deps: KeeperHubMiddlewareDeps): 
       let txHash: string | undefined
       try {
         if (route && khClient) {
-          const callInput = route(args)
+          const callInput = await Promise.resolve(route(args))
           const exec = await khClient.executeContractCall(callInput)
           executionId = exec.executionId
           if (exec.txHash) txHash = exec.txHash
