@@ -3,6 +3,7 @@ import type { ToolAnnotations } from '@/mcp-host/registry'
 import { appendToolCallAudit, type Db, type ToolAuditMeta } from '@/persistence/queries'
 import type { RunContext, ToolMiddleware } from '@/runtime/types'
 import { child } from '@/shared/logger'
+import type { ContractCallInput, KeeperHubClient } from './client'
 
 const log = child({ module: 'keeperhub-middleware' })
 
@@ -50,6 +51,15 @@ export type RunContextProvider = () => RunContext | null
 
 export type AnnotationLookup = (toolName: string) => ToolAnnotations | undefined
 
+/**
+ * Maps a mutate tool's incoming args to a KeeperHub contract-call payload.
+ * Implementations live with each protocol tool (e.g. `aave_supply` provides
+ * its own route that builds the `Pool.supply` call). Returning the payload
+ * is the only contract — when no route is registered for a mutate tool, the
+ * middleware falls through to the original `execute`.
+ */
+export type MutateRoute = (args: unknown) => ContractCallInput
+
 export type KeeperHubMiddlewareDeps = {
   db: Db
   /**
@@ -66,16 +76,29 @@ export type KeeperHubMiddlewareDeps = {
    * Returns `undefined` for tools that have no annotations (defaults apply).
    */
   annotations?: AnnotationLookup
+  /**
+   * KeeperHub workflow routing for mutate tools. When provided AND the tool's
+   * audit decision is `annotation_mutates` AND a route is registered for the
+   * tool's name, the wrapper calls `kh.client.executeContractCall(route(args))`
+   * INSTEAD of the original `execute`. The tool's return becomes the
+   * `ExecutionResult` shape; audit row gains `executionId` and `txHash`.
+   *
+   * Mutate tools without a registered route fall through to the original
+   * `execute` (audit row still records `shouldAudit: true, reason:
+   * 'annotation_mutates'`). Routes are added per protocol as their tools land
+   * (custom Aave PR-5, Uniswap V3 PR-6, etc.).
+   */
+  kh?: {
+    client: KeeperHubClient
+    routes: ReadonlyMap<string, MutateRoute>
+  }
 }
 
 /**
  * Build an audit-by-default middleware that wraps each tool's `execute`,
- * applies `shouldAudit`, runs the original tool, and persists a tool-call
- * row with structured audit metadata.
- *
- * For #8 the middleware always passes through to the original tool (no
- * workflow envelope). #10 will plug in `KeeperHubClient.executeContractCall`
- * for tools whose decision is `shouldAudit=true`.
+ * applies `shouldAudit`, runs the original tool (or routes through KeeperHub
+ * when a mutate route is configured), and persists a tool-call row with
+ * structured audit metadata.
  */
 export function createKeeperHubMiddleware(deps: KeeperHubMiddlewareDeps): ToolMiddleware {
   return (tools) => {
@@ -90,6 +113,12 @@ export function createKeeperHubMiddleware(deps: KeeperHubMiddlewareDeps): ToolMi
 function wrapTool(name: string, original: Tool, deps: KeeperHubMiddlewareDeps): Tool {
   const annotations = deps.annotations?.(name)
   const decision = shouldAudit(name, annotations)
+  // Route this tool through KeeperHub only when (a) it's annotated mutates AND
+  // (b) a route is registered. Mutate tools without a route still audit but
+  // call the original execute.
+  const route =
+    deps.kh && decision.reason === 'annotation_mutates' ? deps.kh.routes.get(name) : undefined
+  const khClient = route ? deps.kh?.client : undefined
 
   const originalExecute = original.execute
   if (!originalExecute) return original
@@ -101,7 +130,21 @@ function wrapTool(name: string, original: Tool, deps: KeeperHubMiddlewareDeps): 
       const runCtx = deps.runContext()
       let result: unknown
       let error: string | undefined
+      let executionId: string | undefined
+      let txHash: string | undefined
       try {
+        if (route && khClient) {
+          const callInput = route(args)
+          const exec = await khClient.executeContractCall(callInput)
+          executionId = exec.executionId
+          if (exec.txHash) txHash = exec.txHash
+          if (exec.status === 'failed' || exec.error) {
+            const msg = exec.error ?? 'KeeperHub execution failed'
+            throw new Error(msg)
+          }
+          result = exec
+          return result
+        }
         result = await originalExecute(args, ctx)
         return result
       } catch (e) {
@@ -112,8 +155,11 @@ function wrapTool(name: string, original: Tool, deps: KeeperHubMiddlewareDeps): 
         const auditMeta: ToolAuditMeta = {
           shouldAudit: decision.shouldAudit,
           reason: decision.reason,
+          ...(executionId ? { executionId } : {}),
+          ...(txHash ? { txHash } : {}),
           details: {
             elapsedMs: finishedAt.getTime() - startedAt.getTime(),
+            ...(route ? { routedThrough: 'keeperhub' as const } : {}),
           },
         }
         if (runCtx) {

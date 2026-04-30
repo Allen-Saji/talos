@@ -6,16 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   type AuthServerMetadata,
   buildAuthorizeUrl,
+  type ContractCallInput,
   clearSession,
   createKeeperHubClient,
   createKeeperHubMiddleware,
   discoverAuthServer,
+  type ExecutionResult,
   exchangeCode,
   generatePkce,
   generateState,
   isExpired,
+  type KeeperHubClient,
   KNOWN_READONLY,
   loadSession,
+  type MutateRoute,
   type RegisteredClient,
   refreshToken,
   registerClient,
@@ -516,6 +520,194 @@ describe('createKeeperHubMiddleware', () => {
     const noExec = { description: 'meta', inputSchema: { type: 'object' as const } } as never
     const wrapped = middleware({ meta: noExec })
     expect(wrapped.meta).toBe(noExec)
+  })
+
+  // ---------------------------------------------------------------------------
+  // Mutate-tool routing through KeeperHub workflow client (#10)
+  // ---------------------------------------------------------------------------
+
+  describe('mutate routing', () => {
+    function fakeKhClient(impl: {
+      executeContractCall: (input: ContractCallInput) => Promise<ExecutionResult>
+    }): KeeperHubClient {
+      return {
+        ensureToken: async () => 'token',
+        listTools: async () => ({}),
+        callTool: async () => undefined,
+        executeContractCall: impl.executeContractCall,
+        executeTransfer: async () => ({ executionId: 'noop', status: 'success' }),
+        getExecutionStatus: async () => ({ executionId: 'noop', status: 'success' }),
+        close: async () => {},
+      }
+    }
+
+    it('routes mutate tool through KH client when route is configured', async () => {
+      const calls: ContractCallInput[] = []
+      const client = fakeKhClient({
+        executeContractCall: async (input) => {
+          calls.push(input)
+          return { executionId: 'exec-1', status: 'success', txHash: '0xdead' }
+        },
+      })
+
+      const aaveRoute: MutateRoute = (args) => {
+        const a = args as { amount: string }
+        return {
+          network: 'sepolia',
+          contract_address: '0xAAVEPOOL',
+          function_name: 'supply',
+          function_args: [a.amount],
+        }
+      }
+
+      const originalCalled = vi.fn()
+      const middleware = createKeeperHubMiddleware({
+        db: handle.db,
+        runContext: () => ({ runId }),
+        annotations: () => ({ mutates: true }),
+        kh: { client, routes: new Map([['aave_supply', aaveRoute]]) },
+      })
+      const wrapped = middleware({
+        aave_supply: makeTool(async (args) => {
+          originalCalled(args)
+          return 'should not be called'
+        }),
+      })
+
+      const result = await wrapped.aave_supply!.execute!(
+        { amount: '100' },
+        { toolCallId: 'tc-mut-1', messages: [] },
+      )
+
+      expect(originalCalled).not.toHaveBeenCalled()
+      expect(calls).toHaveLength(1)
+      expect(calls[0]).toEqual({
+        network: 'sepolia',
+        contract_address: '0xAAVEPOOL',
+        function_name: 'supply',
+        function_args: ['100'],
+      })
+      expect(result).toMatchObject({ executionId: 'exec-1', txHash: '0xdead' })
+
+      const rows = await handle.pg.query<{
+        audit: {
+          shouldAudit: boolean
+          reason: string
+          executionId?: string
+          txHash?: string
+          details: { elapsedMs: number; routedThrough?: string }
+        }
+        result: { executionId: string }
+      }>(`SELECT audit, result FROM tool_calls WHERE tool_call_id = $1`, ['tc-mut-1'])
+      expect(rows.rows[0]?.audit.shouldAudit).toBe(true)
+      expect(rows.rows[0]?.audit.reason).toBe('annotation_mutates')
+      expect(rows.rows[0]?.audit.executionId).toBe('exec-1')
+      expect(rows.rows[0]?.audit.txHash).toBe('0xdead')
+      expect(rows.rows[0]?.audit.details.routedThrough).toBe('keeperhub')
+      expect(rows.rows[0]?.result.executionId).toBe('exec-1')
+    })
+
+    it('falls through to original execute when mutate tool has no route registered', async () => {
+      const client = fakeKhClient({
+        executeContractCall: vi.fn(
+          async (): Promise<ExecutionResult> => ({ executionId: 'noop', status: 'success' }),
+        ),
+      })
+
+      const middleware = createKeeperHubMiddleware({
+        db: handle.db,
+        runContext: () => ({ runId }),
+        annotations: () => ({ mutates: true }),
+        kh: { client, routes: new Map() },
+      })
+      const wrapped = middleware({
+        unknown_swap: makeTool(async () => ({ ok: true })),
+      })
+
+      const result = await wrapped.unknown_swap!.execute!(
+        {},
+        { toolCallId: 'tc-mut-2', messages: [] },
+      )
+
+      expect(result).toEqual({ ok: true })
+      expect(client.executeContractCall).not.toHaveBeenCalled()
+
+      const rows = await handle.pg.query<{
+        audit: { reason: string; executionId?: string; details: { routedThrough?: string } }
+      }>(`SELECT audit FROM tool_calls WHERE tool_call_id = $1`, ['tc-mut-2'])
+      expect(rows.rows[0]?.audit.reason).toBe('annotation_mutates')
+      expect(rows.rows[0]?.audit.executionId).toBeUndefined()
+      expect(rows.rows[0]?.audit.details.routedThrough).toBeUndefined()
+    })
+
+    it('records error when KH execution returns failed status', async () => {
+      const client = fakeKhClient({
+        executeContractCall: async () => ({
+          executionId: 'exec-err',
+          status: 'failed',
+          error: 'revert: insufficient collateral',
+        }),
+      })
+
+      const middleware = createKeeperHubMiddleware({
+        db: handle.db,
+        runContext: () => ({ runId }),
+        annotations: () => ({ mutates: true }),
+        kh: {
+          client,
+          routes: new Map([
+            [
+              'aave_supply',
+              () => ({ network: 'sepolia', contract_address: '0xX', function_name: 'supply' }),
+            ],
+          ]),
+        },
+      })
+      const wrapped = middleware({ aave_supply: makeTool(async () => 'never') })
+
+      await expect(
+        wrapped.aave_supply!.execute!({}, { toolCallId: 'tc-mut-3', messages: [] }),
+      ).rejects.toThrow(/insufficient collateral/)
+
+      const rows = await handle.pg.query<{
+        error: string
+        audit: { executionId?: string }
+      }>(`SELECT error, audit FROM tool_calls WHERE tool_call_id = $1`, ['tc-mut-3'])
+      expect(rows.rows[0]?.error).toContain('insufficient collateral')
+      expect(rows.rows[0]?.audit.executionId).toBe('exec-err')
+    })
+
+    it('does not route read tools even when KH client + route are present', async () => {
+      const client = fakeKhClient({
+        executeContractCall: vi.fn(
+          async (): Promise<ExecutionResult> => ({ executionId: 'wrong', status: 'success' }),
+        ),
+      })
+
+      const middleware = createKeeperHubMiddleware({
+        db: handle.db,
+        runContext: () => ({ runId }),
+        annotations: () => ({ readOnly: true }),
+        kh: {
+          client,
+          routes: new Map([
+            [
+              'aave_get_position',
+              () => ({ network: 'sepolia', contract_address: '0xX', function_name: 'pos' }),
+            ],
+          ]),
+        },
+      })
+      const wrapped = middleware({
+        aave_get_position: makeTool(async () => ({ debt: '0', collateral: '5' })),
+      })
+      const result = await wrapped.aave_get_position!.execute!(
+        {},
+        { toolCallId: 'tc-mut-4', messages: [] },
+      )
+      expect(result).toEqual({ debt: '0', collateral: '5' })
+      expect(client.executeContractCall).not.toHaveBeenCalled()
+    })
   })
 })
 

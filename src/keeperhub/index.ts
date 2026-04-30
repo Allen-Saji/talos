@@ -13,6 +13,7 @@ export {
   createKeeperHubMiddleware,
   type KeeperHubMiddlewareDeps,
   KNOWN_READONLY,
+  type MutateRoute,
   type RunContextProvider,
   type ShouldAuditDecision,
   shouldAudit,
