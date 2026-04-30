@@ -37,6 +37,7 @@ import { createProviderRouter } from '@/runtime/providers'
 import { createRuntime } from '@/runtime/runtime'
 import type { RunContext } from '@/runtime/types'
 import { logger } from '@/shared/logger'
+import { createAaveToolSource } from '@/tools/aave'
 import { createAgentKitToolSource } from '@/tools/agentkit'
 import { createLifiToolSource } from '@/tools/lifi'
 import type { NativeToolSource } from '@/tools/native'
@@ -66,6 +67,11 @@ async function defaultNativeToolSources(env: {
     createLifiToolSource(),
     await createAgentKitToolSource(),
     createUniswapToolSource({
+      walletClient: sepoliaWalletClient,
+      publicClient: sepoliaPublicClient,
+      walletAddress,
+    }),
+    createAaveToolSource({
       walletClient: sepoliaWalletClient,
       publicClient: sepoliaPublicClient,
       walletAddress,
