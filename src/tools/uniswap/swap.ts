@@ -53,27 +53,35 @@ export function buildSwapTool(opts: {
 }) {
   return tool({
     description:
-      'Swap an exact input amount of one token for another on Uniswap V3 (Sepolia). Internally fetches a quote and applies slippage tolerance to compute amountOutMinimum. Requires the SwapRouter02 to be pre-approved for tokenIn (call uniswap_approve_router first).',
+      'Swap an exact input amount of one token for another on Uniswap V3 (Sepolia). Internally fetches a quote and applies slippage tolerance to compute amountOutMinimum. Native ETH input is sent as msg.value (no approval needed); ERC-20 input requires the SwapRouter02 to be pre-approved (call uniswap_approve_router first).',
     inputSchema: SwapSchema,
     execute: async (args): Promise<SwapResult> => {
       const prep = await prepareSwap(args, opts.publicClient)
+      const isNativeIn = prep.tokenIn.symbol === 'ETH'
 
       // Fail-loud allowance precondition: confirm the router can pull tokenIn
       // from the wallet before we burn gas on a swap that will revert.
-      const allowance = (await opts.publicClient.readContract({
-        address: prep.tokenIn.address,
-        abi: ERC20_ABI,
-        functionName: 'allowance',
-        args: [opts.walletAddress, SEPOLIA_UNISWAP.swapRouter02 as Address],
-      })) as bigint
-      if (allowance < prep.amountInRaw) {
-        throw new Error(
-          `insufficient allowance: SwapRouter02 has ${allowance.toString()} but needs ${prep.amountInRaw.toString()}; call uniswap_approve_router first`,
-        )
+      // Native ETH input bypasses this — tokens are sent via msg.value.
+      if (!isNativeIn) {
+        const allowance = (await opts.publicClient.readContract({
+          address: prep.tokenIn.address,
+          abi: ERC20_ABI,
+          functionName: 'allowance',
+          args: [opts.walletAddress, SEPOLIA_UNISWAP.swapRouter02 as Address],
+        })) as bigint
+        if (allowance < prep.amountInRaw) {
+          throw new Error(
+            `insufficient allowance: SwapRouter02 has ${allowance.toString()} but needs ${prep.amountInRaw.toString()}; call uniswap_approve_router first`,
+          )
+        }
       }
 
+      // Pass the bound Account (PrivateKeyAccount) so viem signs locally and
+      // uses eth_sendRawTransaction. Falling through to a bare Address makes
+      // viem think this is an EIP-1193 wallet and try wallet_sendTransaction,
+      // which public RPCs don't support.
       const txHash = await opts.walletClient.writeContract({
-        account: opts.walletAddress,
+        account: opts.walletClient.account ?? opts.walletAddress,
         chain: opts.walletClient.chain ?? null,
         address: SEPOLIA_UNISWAP.swapRouter02 as Address,
         abi: SWAP_ROUTER_ABI,
@@ -89,6 +97,7 @@ export function buildSwapTool(opts: {
             sqrtPriceLimitX96: 0n,
           },
         ],
+        value: isNativeIn ? prep.amountInRaw : 0n,
       })
 
       return {
