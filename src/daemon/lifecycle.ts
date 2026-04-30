@@ -1,8 +1,17 @@
 import fs from 'node:fs'
+import { createPublicClient, http } from 'viem'
+import { sepolia } from 'viem/chains'
 import { loadEnv, resetEnvCache } from '@/config/env'
 import { paths } from '@/config/paths'
 import { ensureToken } from '@/config/token'
-import { type AnnotationLookup, createKeeperHubMiddleware, type ToolMiddleware } from '@/keeperhub'
+import {
+  type AnnotationLookup,
+  createKeeperHubClient,
+  createKeeperHubMiddleware,
+  type KeeperHubClient,
+  type MutateRoute,
+  type ToolMiddleware,
+} from '@/keeperhub'
 import { defaultMcpServers, McpHost, McpToolSource, type ToolAnnotations } from '@/mcp-host'
 import {
   assertNoLiveDaemon,
@@ -21,6 +30,8 @@ import { logger } from '@/shared/logger'
 import { createAgentKitToolSource } from '@/tools/agentkit'
 import { createLifiToolSource } from '@/tools/lifi'
 import type { NativeToolSource } from '@/tools/native'
+import { createUniswapToolSource } from '@/tools/uniswap'
+import { getViemWalletClient, getWalletAddress } from '@/wallet'
 import { type ControlPlane, createControlPlane } from './server'
 
 /**
@@ -28,11 +39,28 @@ import { type ControlPlane, createControlPlane } from './server'
  * Each source contributes pre-namespaced tools and self-declared
  * annotations consulted by the KeeperHub middleware.
  *
- * AgentKit init is async (it awaits action-provider registration); other
- * sources construct synchronously.
+ * Uniswap needs the wallet + a Sepolia RPC. AgentKit init is async (it awaits
+ * action-provider registration); other sources construct synchronously.
  */
-async function defaultNativeToolSources(): Promise<NativeToolSource[]> {
-  return [createLifiToolSource(), await createAgentKitToolSource()]
+async function defaultNativeToolSources(env: {
+  RPC_URL_SEPOLIA?: string | undefined
+}): Promise<NativeToolSource[]> {
+  const sepoliaPublicClient = createPublicClient({
+    chain: sepolia,
+    transport: http(env.RPC_URL_SEPOLIA),
+  })
+  const sepoliaWalletClient = getViemWalletClient('sepolia')
+  const walletAddress = getWalletAddress()
+
+  return [
+    createLifiToolSource(),
+    await createAgentKitToolSource(),
+    createUniswapToolSource({
+      walletClient: sepoliaWalletClient,
+      publicClient: sepoliaPublicClient,
+      walletAddress,
+    }),
+  ]
 }
 
 export type DaemonHandle = {
@@ -105,10 +133,13 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
   }
 
   // In-process (native) tool sources contribute Talos-owned tools (Li.Fi,
-  // AgentKit cherry-pick, future custom Aave/Uniswap). Share the runtime's
-  // tool surface with the MCP host and provide their own annotations to the
-  // KeeperHub middleware. No spawn cost, no serialization round-trip.
-  const nativeSources: NativeToolSource[] = await defaultNativeToolSources()
+  // AgentKit cherry-pick, Uniswap V3 on Sepolia, future custom Aave). Share
+  // the runtime's tool surface with the MCP host and provide their own
+  // annotations to the KeeperHub middleware. No spawn cost, no serialization
+  // round-trip.
+  const nativeSources: NativeToolSource[] = await defaultNativeToolSources({
+    RPC_URL_SEPOLIA: env.RPC_URL_SEPOLIA,
+  })
   for (const src of nativeSources) {
     logger.info({ source: src.name, tools: src.toolNames().length }, 'native tool source ready')
   }
@@ -129,14 +160,42 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     return undefined
   }
 
-  // Per-run middleware factory. Bound at boot to db + annotation lookup; the
-  // runtime calls it per run with the runId so audit rows carry the right
-  // run context. Single writer for `tool_calls` (persistStep no longer inserts).
+  // Aggregate KeeperHub mutate routes from every native source. Mutate tools
+  // in MCP-hosted servers don't yet declare routes — when they do, the host
+  // can expose a similar `routes()` getter and we union here.
+  const routes = new Map<string, MutateRoute>()
+  for (const src of nativeSources) {
+    for (const [name, route] of Object.entries(src.routes())) {
+      routes.set(name, route)
+    }
+  }
+  if (routes.size > 0) {
+    logger.info({ count: routes.size, names: [...routes.keys()] }, 'mutate routes registered')
+  }
+
+  // KeeperHub client is opt-in: built only when a session token exists on
+  // disk (operator ran `talos init` and completed OAuth). When absent, mutate
+  // tools fall through to direct execute and audit rows still record the
+  // call. We retain the warning so demo runs notice the missing wiring.
+  let khClient: KeeperHubClient | undefined
+  try {
+    khClient = await createKeeperHubClient({ tokenPath: paths.keeperhubTokenPath })
+  } catch (err) {
+    logger.info(
+      { err: err instanceof Error ? err.message : String(err) },
+      'keeperhub session not configured — mutate routing disabled (run `talos init` to enable)',
+    )
+  }
+
+  // Per-run middleware factory. Bound at boot to db + annotation lookup +
+  // optional KH client/routes; the runtime calls it per run with the runId so
+  // audit rows carry the right run context. Single writer for `tool_calls`.
   const toolMiddleware = (ctx: RunContext): ToolMiddleware =>
     createKeeperHubMiddleware({
       db: dbHandle.db,
       runContext: () => ctx,
       annotations: annotationLookup,
+      ...(khClient ? { kh: { client: khClient, routes } } : {}),
     })
 
   // Build runtime deps. Knowledge / summarizer / fact pipeline are deferred
@@ -195,6 +254,13 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
           await mcpHost.stop()
         } catch (err) {
           logger.warn({ err }, 'error stopping mcp host')
+        }
+      }
+      if (khClient) {
+        try {
+          await khClient.close()
+        } catch (err) {
+          logger.warn({ err }, 'error closing keeperhub client')
         }
       }
       try {
