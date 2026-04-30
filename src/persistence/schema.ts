@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import {
   type AnyPgColumn,
+  customType,
   index,
   integer,
   jsonb,
@@ -11,6 +12,15 @@ import {
   uuid,
   vector,
 } from 'drizzle-orm/pg-core'
+
+/**
+ * Postgres `tsvector` column type. drizzle 0.45 has no built-in for it; the
+ * raw type is needed because `to_tsvector(...)` returns `tsvector` and
+ * Postgres rejects the cast to `text` on a generated column.
+ */
+const tsvector = customType<{ data: string }>({
+  dataType: () => 'tsvector',
+})
 
 export const runStatus = pgEnum('run_status', ['running', 'completed', 'failed', 'cancelled'])
 
@@ -97,18 +107,18 @@ export const messageEmbeddings = pgTable(
     role: text('role').notNull(),
     content: text('content').notNull(),
     embedding: vector('embedding', { dimensions: 1536 }).notNull(),
-    // TODO(persistence-impl): wire `tsv` as a STORED generated column for hybrid
-    // retrieval (HNSW + GIN). drizzle-orm 0.45.2 rejected the 2-arg
-    // `.generatedAlwaysAs(sql, { mode: 'stored' })` signature; resolve by
-    // (1) finding the correct API for this version, (2) using a Postgres
-    // trigger via custom migration, or (3) computing in TS at insert time.
-    // Also add the GIN index on `tsv` once the column is populated.
-    tsv: text('tsv'),
+    /**
+     * Postgres maintains this column via `GENERATED ALWAYS AS (...) STORED`.
+     * Backed by the GIN index below — used for the lexical half of hybrid
+     * retrieval (`searchMessages` does `tsv @@ plainto_tsquery(...)`).
+     */
+    tsv: tsvector('tsv').generatedAlwaysAs(sql`to_tsvector('english', content)`),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('message_embeddings_thread_idx').on(t.threadId),
     index('message_embeddings_hnsw_idx').using('hnsw', sql`${t.embedding} vector_cosine_ops`),
+    index('message_embeddings_tsv_gin_idx').using('gin', t.tsv),
   ],
 )
 

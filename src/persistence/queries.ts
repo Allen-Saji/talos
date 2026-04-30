@@ -183,9 +183,9 @@ export type SearchOptions = {
  * Pulls top `vectorPoolSize` (default 20) by vector distance, left-joins keyword ranks,
  * orders by combined score. Mirrors spike-2-pglite which proved 4ms vector queries.
  *
- * NOTE: tsv is computed inline via `to_tsvector('english', content)` because the
- * STORED generated column is tracked separately in issue #15. When that column
- * lands the WHERE/ORDER expressions swap to `tsv @@ ...` and `ts_rank(tsv, ...)`.
+ * Lexical match uses the `tsv` STORED generated column (Postgres maintains it
+ * via `to_tsvector('english', content)`) and the `message_embeddings_tsv_gin_idx`
+ * GIN index — `@@` and `ts_rank` consult the index instead of recomputing.
  */
 export async function searchMessages(
   db: Db,
@@ -218,10 +218,10 @@ export async function searchMessages(
     ),
     k AS (
       SELECT id,
-             ts_rank(to_tsvector('english', content), plainto_tsquery('english', ${queryText})) AS krank
+             ts_rank(tsv, plainto_tsquery('english', ${queryText})) AS krank
       FROM message_embeddings
       WHERE thread_id = ${threadId}
-        AND to_tsvector('english', content) @@ plainto_tsquery('english', ${queryText})
+        AND tsv @@ plainto_tsquery('english', ${queryText})
     )
     SELECT v.id, v.thread_id, v.run_id, v.role, v.content,
            v.vsim,
