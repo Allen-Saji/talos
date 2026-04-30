@@ -70,7 +70,7 @@ const lifi_get_connections = tool({
 
 const lifi_get_quote = tool({
   description:
-    'Get the best route to swap or bridge a token amount across chains. Returns selected bridge, expected output amount, fees, gas estimate, ETA, and step-by-step transactions. The single most useful Li.Fi tool — use this whenever the user asks "what is the rate / best route" for a cross-chain transfer.',
+    'Cross-chain only. Get the best route to bridge or swap tokens between two DIFFERENT chains (e.g. Ethereum → Arbitrum). Returns selected bridge, expected output amount, fees, gas estimate, ETA, and step-by-step transactions. Do NOT use for same-chain swaps — for that use the protocol-specific tool (e.g. uniswap_get_quote on Sepolia).',
   inputSchema: z.object({
     fromChain: ChainRef,
     fromToken: z.string().describe('Token address (preferred) or symbol on the source chain'),

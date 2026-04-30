@@ -56,8 +56,11 @@ export function buildApproveTool(opts: {
 
       // viem's WalletClient.sendTransaction is the lowest-friction send for an
       // arbitrary calldata; writeContract would re-encode args we already have.
+      // Pass the bound Account so viem signs locally (eth_sendRawTransaction)
+      // instead of falling back to wallet_sendTransaction (browser-wallet RPC,
+      // unsupported by public node providers).
       const txHash = await opts.walletClient.sendTransaction({
-        account: opts.walletAddress,
+        account: opts.walletClient.account ?? opts.walletAddress,
         chain: opts.walletClient.chain ?? null,
         to: token.address,
         data,

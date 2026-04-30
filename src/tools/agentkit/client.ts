@@ -9,6 +9,7 @@ import {
   pythActionProvider,
   sushiRouterActionProvider,
   ViemWalletProvider,
+  walletActionProvider,
   zerionActionProvider,
   zeroXActionProvider,
   zoraActionProvider,
@@ -22,7 +23,7 @@ const log = logger.child({ module: 'agentkit' })
 let cached: AgentKit | undefined
 
 /**
- * Lazy-init AgentKit with a Base-Sepolia-bound viem wallet and the cherry-pick
+ * Lazy-init AgentKit with a Sepolia-bound viem wallet and the cherry-pick
  * of action providers per spec F3.1 (minus Farcaster — separate signer model,
  * deferred to a follow-up).
  *
@@ -38,7 +39,7 @@ export async function getAgentKit(): Promise<AgentKit> {
   if (cached) return cached
 
   const env = loadEnv()
-  const walletClient = getViemWalletClient('baseSepolia')
+  const walletClient = getViemWalletClient('sepolia')
   const walletProvider = new ViemWalletProvider(
     // ViemWalletProvider's typing wants its internal `ViemWalletClient` shape;
     // viem's `WalletClient` is structurally compatible at runtime.
@@ -52,6 +53,7 @@ export async function getAgentKit(): Promise<AgentKit> {
   // their env-var key is missing. Wrap each in a try/catch so a single missing
   // key only drops that provider — not the rest of the AgentKit surface.
   const candidates: Array<{ name: string; build: () => AnyActionProvider }> = [
+    { name: 'wallet', build: walletActionProvider },
     { name: 'pyth', build: pythActionProvider },
     { name: 'compound', build: compoundActionProvider },
     { name: 'morpho', build: morphoActionProvider },
