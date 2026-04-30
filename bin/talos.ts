@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { Command } from 'commander'
-import { runRepl, runStdioMcpProxy } from '@/channels'
+import { createDaemonClient, runRepl, runStdioMcpProxy } from '@/channels'
 import { paths } from '@/config/paths'
 import { ensureToken } from '@/config/token'
 import {
@@ -88,6 +88,40 @@ program
     }
     const token = await ensureToken()
     await runStdioMcpProxy({ daemonUrl: url, token })
+  })
+
+program
+  .command('knowledge:refresh')
+  .description('Force a knowledge cron tick now and print the per-source report')
+  .option('--port <number>', 'daemon port', (v) => Number.parseInt(v, 10))
+  .option('--no-autostart', 'do not auto-spawn talosd if not running')
+  .action(async (opts: { port?: number; autostart?: boolean }) => {
+    const port = opts.port ?? Number(process.env.TALOS_DAEMON_PORT ?? 7711)
+    const url = `ws://127.0.0.1:${port}`
+    if (opts.autostart !== false) {
+      await ensureDaemonRunning({ url })
+    }
+    const token = await ensureToken()
+    const client = createDaemonClient({ url, token, client: 'talos-cli' })
+    try {
+      await client.start()
+      const result = await client.knowledgeRefresh()
+      const lines: string[] = []
+      lines.push('Knowledge refresh complete.')
+      lines.push(`  started: ${result.startedAt}`)
+      lines.push(`  finished: ${result.finishedAt}`)
+      lines.push(`  total: ${result.totalDurationMs}ms`)
+      lines.push('  sources:')
+      for (const s of result.sources) {
+        const status = s.error ? `ERROR: ${s.error}` : `${s.fetched} items -> ${s.chunks} chunks`
+        lines.push(`    - ${s.source.padEnd(28)} ${status} (${s.durationMs}ms)`)
+      }
+      process.stdout.write(`${lines.join('\n')}\n`)
+      const anyError = result.sources.some((s) => s.error)
+      process.exit(anyError ? 1 : 0)
+    } finally {
+      await client.close()
+    }
   })
 
 program

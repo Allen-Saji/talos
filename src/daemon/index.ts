@@ -22,4 +22,5 @@ export {
   type ControlPlane,
   type ControlPlaneOpts,
   createControlPlane,
+  type KnowledgeController,
 } from './server'

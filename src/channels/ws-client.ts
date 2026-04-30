@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import { WebSocket } from 'ws'
 import {
   type ClientFrame,
+  type KnowledgeRefreshDoneFrame,
   PROTOCOL_VERSION,
   type RunDoneFrame,
   ServerFrame as ServerFrameSchema,
@@ -42,9 +44,13 @@ export type DaemonClient = {
   start(): Promise<void>
   /** Issue a run-start. Only one inflight run is allowed per client in v1. */
   runStart(opts: RunStartOpts): RunStream
+  /** Send a knowledge-refresh frame and await the done report. */
+  knowledgeRefresh(opts?: { timeoutMs?: number }): Promise<KnowledgeRefreshDoneFrame>
   /** Close the WS. Pending run is rejected. */
   close(): Promise<void>
 }
+
+const DEFAULT_KNOWLEDGE_REFRESH_TIMEOUT_MS = 5 * 60 * 1000
 
 const DEFAULT_HELLO_TIMEOUT_MS = 5_000
 
@@ -102,10 +108,17 @@ type Pending = {
   cancelRequested: boolean
 }
 
+type KnowledgeRequest = {
+  resolve: (frame: KnowledgeRefreshDoneFrame) => void
+  reject: (err: Error) => void
+  timer: NodeJS.Timeout
+}
+
 export function createDaemonClient(opts: DaemonClientOpts): DaemonClient {
   const helloTimeoutMs = opts.helloTimeoutMs ?? DEFAULT_HELLO_TIMEOUT_MS
   let ws: WebSocket | null = null
   let pending: Pending | null = null
+  const knowledgeRequests = new Map<string, KnowledgeRequest>()
   let closed = false
 
   function sendFrame(frame: ClientFrame): void {
@@ -163,8 +176,29 @@ export function createDaemonClient(opts: DaemonClientOpts): DaemonClient {
       return
     }
 
+    if (frame.type === 'knowledge-refresh-done') {
+      const req = knowledgeRequests.get(frame.requestId)
+      if (req) {
+        clearTimeout(req.timer)
+        knowledgeRequests.delete(frame.requestId)
+        req.resolve(frame)
+      } else {
+        log.warn({ requestId: frame.requestId }, 'knowledge-refresh-done for unknown request')
+      }
+      return
+    }
+
     if (frame.type === 'error') {
       const err = new Error(`${frame.code}: ${frame.message}`)
+      if (frame.requestId) {
+        const req = knowledgeRequests.get(frame.requestId)
+        if (req) {
+          clearTimeout(req.timer)
+          knowledgeRequests.delete(frame.requestId)
+          req.reject(err)
+          return
+        }
+      }
       if (
         pending &&
         (frame.runId === pending.runId ||
@@ -178,6 +212,14 @@ export function createDaemonClient(opts: DaemonClientOpts): DaemonClient {
     }
 
     // hello-ack — handled inline by start()
+  }
+
+  function failKnowledgeRequests(err: Error): void {
+    for (const [id, req] of knowledgeRequests) {
+      clearTimeout(req.timer)
+      knowledgeRequests.delete(id)
+      req.reject(err)
+    }
   }
 
   return {
@@ -229,6 +271,7 @@ export function createDaemonClient(opts: DaemonClientOpts): DaemonClient {
       ws.on('close', () => {
         closed = true
         if (pending) failPending(new Error('daemon connection closed'))
+        failKnowledgeRequests(new Error('daemon connection closed'))
       })
       ws.on('error', (err) => {
         log.warn({ err }, 'ws error')
@@ -287,9 +330,30 @@ export function createDaemonClient(opts: DaemonClientOpts): DaemonClient {
       }
     },
 
+    knowledgeRefresh(reqOpts?: { timeoutMs?: number }): Promise<KnowledgeRefreshDoneFrame> {
+      if (closed || !ws) return Promise.reject(new Error('daemon client not connected'))
+      const requestId = randomUUID()
+      const timeoutMs = reqOpts?.timeoutMs ?? DEFAULT_KNOWLEDGE_REFRESH_TIMEOUT_MS
+      return new Promise<KnowledgeRefreshDoneFrame>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          knowledgeRequests.delete(requestId)
+          reject(new Error(`knowledge-refresh timed out after ${timeoutMs}ms`))
+        }, timeoutMs)
+        knowledgeRequests.set(requestId, { resolve, reject, timer })
+        try {
+          sendFrame({ type: 'knowledge-refresh', requestId })
+        } catch (err) {
+          clearTimeout(timer)
+          knowledgeRequests.delete(requestId)
+          reject(err instanceof Error ? err : new Error(String(err)))
+        }
+      })
+    },
+
     async close(): Promise<void> {
       closed = true
       if (pending) failPending(new Error('daemon client closing'))
+      failKnowledgeRequests(new Error('daemon client closing'))
       if (!ws) return
       const target = ws
       ws = null

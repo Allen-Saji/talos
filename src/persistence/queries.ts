@@ -2,7 +2,9 @@ import { sql } from 'drizzle-orm'
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core'
 import { TalosDbError } from '@/shared/errors'
 import {
+  knowledgeChunks,
   messageEmbeddings,
+  type NewKnowledgeChunk,
   type NewMessageEmbedding,
   type NewRun,
   type NewStep,
@@ -316,6 +318,101 @@ export async function searchThreadSummaries(
       createdAt: String(row.created_at),
     }))
     .filter((h) => h.vsim >= threshold)
+}
+
+// ---------- knowledge chunks (cron-fed ETH ecosystem context) ----------
+
+export type KnowledgeChunkInput = {
+  chunkIndex: number
+  content: string
+  embedding: number[]
+  metadata?: Record<string, unknown> | null
+}
+
+/**
+ * Replace all chunks for a `(source, sourceId)` pair atomically. Cron-time
+ * idempotency: re-running a fetch wipes the prior set and inserts the new one
+ * in a single transaction, so partial failures never leave orphan chunks and
+ * content drift produces no stale rows.
+ *
+ * `sourceId` is required by this contract (callers pass a stable doc key like
+ * a slug); the schema column is nullable for forward compatibility.
+ */
+export async function replaceKnowledgeChunks(
+  db: Db,
+  source: string,
+  sourceId: string,
+  rows: readonly KnowledgeChunkInput[],
+): Promise<void> {
+  for (const r of rows) {
+    if (r.embedding.length !== EMBEDDING_DIMS) {
+      throw new TalosDbError(
+        `chunk embedding must be ${EMBEDDING_DIMS}-d (got ${r.embedding.length})`,
+        'DB_BAD_EMBEDDING',
+      )
+    }
+  }
+  await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`DELETE FROM knowledge_chunks WHERE source = ${source} AND source_id = ${sourceId}`,
+    )
+    if (rows.length === 0) return
+    const values: NewKnowledgeChunk[] = rows.map((r) => ({
+      source,
+      sourceId,
+      chunkIndex: r.chunkIndex,
+      content: r.content,
+      embedding: r.embedding,
+      metadata: r.metadata ?? null,
+    }))
+    await tx.insert(knowledgeChunks).values(values)
+  })
+}
+
+export type KnowledgeChunkHitRow = {
+  id: string
+  source: string
+  sourceId: string | null
+  chunkIndex: number
+  content: string
+  metadata: Record<string, unknown> | null
+  score: number
+}
+
+/**
+ * Cosine top-K over `knowledge_chunks` using the HNSW `vector_cosine_ops`
+ * index (`<=>`). Score is `1 - distance` so callers can treat higher as
+ * better, matching the message-search convention.
+ */
+export async function searchKnowledgeChunks(
+  db: Db,
+  queryEmbedding: number[],
+  topK = 5,
+): Promise<KnowledgeChunkHitRow[]> {
+  if (queryEmbedding.length !== EMBEDDING_DIMS) {
+    throw new TalosDbError(
+      `queryEmbedding must be ${EMBEDDING_DIMS}-d (got ${queryEmbedding.length})`,
+      'DB_BAD_EMBEDDING',
+    )
+  }
+  const embeddingLiteral = `[${queryEmbedding.join(',')}]`
+  const result = (await db.execute(sql`
+    SELECT id, source, source_id, chunk_index, content, metadata,
+           1 - (embedding <=> ${embeddingLiteral}::vector) AS score
+    FROM knowledge_chunks
+    ORDER BY embedding <=> ${embeddingLiteral}::vector
+    LIMIT ${topK}
+  `)) as ExecuteResult
+
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    source: String(row.source),
+    sourceId: row.source_id == null ? null : String(row.source_id),
+    chunkIndex: Number(row.chunk_index),
+    content: String(row.content),
+    metadata: (row.metadata as Record<string, unknown> | null) ?? null,
+    score: Number(row.score),
+  }))
 }
 
 type ThreadSummaryRow = {
