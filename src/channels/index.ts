@@ -7,6 +7,16 @@ export {
   runStdioMcpProxy,
 } from './mcp-server/server'
 export {
+  type ChannelsConfig,
+  createTelegramBot,
+  loadChannelsConfig,
+  resetChannelsConfigCache,
+  resolveBotToken,
+  type TelegramBotHandle,
+  type TelegramBotOpts,
+  type TelegramChannelConfig,
+} from './telegram'
+export {
   createDaemonClient,
   type DaemonClient,
   type DaemonClientOpts,
