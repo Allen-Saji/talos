@@ -1,3 +1,4 @@
+export type { RunContext, ToolMiddleware } from '@/runtime/types'
 export {
   type ContractCallInput,
   createKeeperHubClient,
@@ -12,11 +13,9 @@ export {
   createKeeperHubMiddleware,
   type KeeperHubMiddlewareDeps,
   KNOWN_READONLY,
-  type RunContext,
   type RunContextProvider,
   type ShouldAuditDecision,
   shouldAudit,
-  type ToolMiddleware,
 } from './middleware'
 export {
   type AuthServerMetadata,

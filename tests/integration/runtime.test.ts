@@ -2,6 +2,7 @@ import { tool } from 'ai'
 import { MockLanguageModelV3, simulateReadableStream } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { createKeeperHubMiddleware } from '@/keeperhub'
 import {
   applyFactOps,
   createDb,
@@ -18,8 +19,10 @@ import {
   type EmbeddingsService,
   type FactPipeline,
   type ProviderRouter,
+  type RunContext,
   TALOS_ETH_AGENT,
   type ThreadSummarizer,
+  type ToolMiddleware,
   type ToolSource,
 } from '@/runtime'
 
@@ -331,7 +334,7 @@ describe('runtime — tool calling', () => {
     await handle?.close()
   })
 
-  it('records tool_calls with args + result; multi-step run advances stepIndex', async () => {
+  it('writes a single audit row per tool call (KeeperHub middleware single writer)', async () => {
     const flow = toolCallThenTextChunks({
       toolName: 'getBalance',
       toolCallId: 'call_1',
@@ -347,12 +350,19 @@ describe('runtime — tool calling', () => {
     })
     const toolSource: ToolSource = { getTools: async () => ({ getBalance: balanceTool }) }
 
+    const toolMiddleware = (ctx: RunContext): ToolMiddleware =>
+      createKeeperHubMiddleware({
+        db: handle.db,
+        runContext: () => ctx,
+      })
+
     const runtime = createRuntime({
       db: handle,
       providers: singleModelRouter(model),
       embeddings: deterministicEmbeddings(),
       agents: withRegistry(),
       toolSources: [toolSource],
+      toolMiddleware,
       config: { maxSteps: 3 },
     })
 
@@ -365,18 +375,127 @@ describe('runtime — tool calling', () => {
 
     const tcalls = await handle.pg.query<{
       tool_name: string
-      args: unknown
-      result: unknown
-      step_id: string
-    }>(`SELECT tool_name, args, result, step_id FROM tool_calls WHERE run_id = $1`, [r.runId])
+      args: { wallet: string }
+      result: { balance: string }
+      audit: { shouldAudit: boolean; reason: string; details: { elapsedMs: number } }
+      error: string | null
+    }>(`SELECT tool_name, args, result, audit, error FROM tool_calls WHERE run_id = $1`, [r.runId])
     expect(tcalls.rows.length).toBe(1)
-    expect(tcalls.rows[0]?.tool_name).toBe('getBalance')
+    const row = tcalls.rows[0]!
+    expect(row.tool_name).toBe('getBalance')
+    expect(row.args.wallet).toBe('0xABC')
+    expect(row.result.balance).toBe('5 ETH')
+    expect(row.audit.shouldAudit).toBe(true)
+    expect(row.audit.reason).toBe('audit_default')
+    expect(row.audit.details.elapsedMs).toBeGreaterThanOrEqual(0)
+    expect(row.error).toBeNull()
 
     const steps = await handle.pg.query<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM steps WHERE run_id = $1`,
       [r.runId],
     )
     expect(Number(steps.rows[0]?.count ?? '0')).toBeGreaterThanOrEqual(2)
+  })
+
+  it('records error and shouldAudit reason when tool throws', async () => {
+    const flow = toolCallThenTextChunks({
+      toolName: 'aave_supply',
+      toolCallId: 'call_err',
+      input: { amount: '100' },
+      finalText: 'I could not complete the supply.',
+    })
+    const model = makeMockModel([flow.step1, flow.step2])
+
+    const supplyTool = tool({
+      description: 'Supply to Aave',
+      inputSchema: z.object({ amount: z.string() }),
+      execute: async (_input): Promise<{ ok: boolean }> => {
+        throw new Error('insufficient liquidity')
+      },
+    })
+    const toolSource: ToolSource = { getTools: async () => ({ aave_supply: supplyTool }) }
+
+    const toolMiddleware = (ctx: RunContext): ToolMiddleware =>
+      createKeeperHubMiddleware({
+        db: handle.db,
+        runContext: () => ctx,
+        annotations: (name) => (name === 'aave_supply' ? { mutates: true } : undefined),
+      })
+
+    const runtime = createRuntime({
+      db: handle,
+      providers: singleModelRouter(model),
+      embeddings: deterministicEmbeddings(),
+      agents: withRegistry(),
+      toolSources: [toolSource],
+      toolMiddleware,
+      config: { maxSteps: 3 },
+    })
+
+    const r = await runtime.run({
+      threadId: 't-tools-err',
+      channel: 'cli',
+      intent: 'supply 100 USDC',
+    })
+    await drain(r)
+
+    const tcalls = await handle.pg.query<{
+      tool_name: string
+      audit: { shouldAudit: boolean; reason: string }
+      error: string | null
+    }>(`SELECT tool_name, audit, error FROM tool_calls WHERE run_id = $1`, [r.runId])
+    expect(tcalls.rows.length).toBe(1)
+    const row = tcalls.rows[0]!
+    expect(row.tool_name).toBe('aave_supply')
+    expect(row.audit.shouldAudit).toBe(true)
+    expect(row.audit.reason).toBe('annotation_mutates')
+    expect(row.error).toContain('insufficient liquidity')
+  })
+
+  it('passes tools through unchanged when toolMiddleware is undefined (no audit rows)', async () => {
+    const flow = toolCallThenTextChunks({
+      toolName: 'getBalance',
+      toolCallId: 'call_no_mw',
+      input: { wallet: '0xDEF' },
+      finalText: 'ok',
+    })
+    const model = makeMockModel([flow.step1, flow.step2])
+
+    const balanceTool = tool({
+      description: 'Get wallet balance',
+      inputSchema: z.object({ wallet: z.string() }),
+      execute: async ({ wallet }) => ({ wallet, balance: '0' }),
+    })
+    const toolSource: ToolSource = { getTools: async () => ({ getBalance: balanceTool }) }
+
+    const runtime = createRuntime({
+      db: handle,
+      providers: singleModelRouter(model),
+      embeddings: deterministicEmbeddings(),
+      agents: withRegistry(),
+      toolSources: [toolSource],
+      config: { maxSteps: 3 },
+    })
+
+    const r = await runtime.run({
+      threadId: 't-no-mw',
+      channel: 'cli',
+      intent: 'check 0xDEF',
+    })
+    await drain(r)
+
+    const tcalls = await handle.pg.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM tool_calls WHERE run_id = $1`,
+      [r.runId],
+    )
+    expect(tcalls.rows[0]?.count).toBe('0')
+
+    // step row still landed with tool_calls jsonb summary
+    const stepRow = await handle.pg.query<{ tool_calls: unknown }>(
+      `SELECT tool_calls FROM steps WHERE run_id = $1 ORDER BY step_index ASC LIMIT 1`,
+      [r.runId],
+    )
+    expect(stepRow.rows[0]?.tool_calls).not.toBeNull()
   })
 })
 

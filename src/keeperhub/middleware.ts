@@ -1,6 +1,7 @@
 import type { Tool } from 'ai'
 import type { ToolAnnotations } from '@/mcp-host/registry'
 import { appendToolCallAudit, type Db, type ToolAuditMeta } from '@/persistence/queries'
+import type { RunContext, ToolMiddleware } from '@/runtime/types'
 import { child } from '@/shared/logger'
 
 const log = child({ module: 'keeperhub-middleware' })
@@ -45,12 +46,6 @@ export function shouldAudit(toolName: string, annotations?: ToolAnnotations): Sh
   return { shouldAudit: true, reason: 'audit_default' }
 }
 
-/** Per-call run context that the runtime threads in (one per agent run). */
-export type RunContext = {
-  runId: string
-  stepId?: string | null
-}
-
 export type RunContextProvider = () => RunContext | null
 
 export type AnnotationLookup = (toolName: string) => ToolAnnotations | undefined
@@ -72,8 +67,6 @@ export type KeeperHubMiddlewareDeps = {
    */
   annotations?: AnnotationLookup
 }
-
-export type ToolMiddleware = (tools: Record<string, Tool>) => Record<string, Tool>
 
 /**
  * Build an audit-by-default middleware that wraps each tool's `execute`,
