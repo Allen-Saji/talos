@@ -12,6 +12,7 @@ import {
   runDiagnostics,
   writeServiceArtifact,
 } from '@/daemon'
+import { runWizard } from '@/init'
 import { assertNoLiveDaemon, createDb, runMigrations } from '@/persistence'
 import { TalosNotImplementedError } from '@/shared/errors'
 import { logger } from '@/shared/logger'
@@ -23,10 +24,19 @@ program.name('talos').description('Vertical ETH agent — daemon + thin clients'
 program
   .command('init')
   .description('Bootstrap a new Talos installation')
-  .action(() => {
-    logger.info('init: not implemented')
-    throw new TalosNotImplementedError('talos init')
-  })
+  .option('--non-interactive', 'read all values from env, skip prompts (for CI)')
+  .option('--skip-keeperhub', 'skip the KeeperHub OAuth step (rerun later)')
+  .option('--skip-service', 'skip the service-install prompt')
+  .action(
+    async (opts: { nonInteractive?: boolean; skipKeeperhub?: boolean; skipService?: boolean }) => {
+      const result = await runWizard({
+        mode: opts.nonInteractive ? 'non-interactive' : 'interactive',
+        skipKeeperhub: opts.skipKeeperhub ?? false,
+        skipService: opts.skipService ?? opts.nonInteractive ?? false,
+      })
+      process.exit(result.succeeded ? 0 : 1)
+    },
+  )
 
 program
   .command('install-service')
