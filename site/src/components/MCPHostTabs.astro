@@ -1,0 +1,83 @@
+---
+const claude = `{
+  "mcpServers": {
+    "talos": {
+      "command": "npx",
+      "args": ["talos", "serve", "--mcp"]
+    }
+  }
+}`;
+
+const cursor = `{
+  "mcpServers": {
+    "talos": {
+      "command": "npx",
+      "args": ["talos", "serve", "--mcp"]
+    }
+  }
+}`;
+
+const openclaw = `mcpServers:
+  talos:
+    command: npx
+    args: [talos, serve, --mcp]`;
+
+const tabs = [
+  { id: 'claude', label: 'Claude Desktop', code: claude, lang: 'json', path: '~/Library/Application Support/Claude/claude_desktop_config.json' },
+  { id: 'cursor', label: 'Cursor', code: cursor, lang: 'json', path: '~/.cursor/mcp.json' },
+  { id: 'openclaw', label: 'OpenClaw', code: openclaw, lang: 'yaml', path: '~/.openclaw/mcp.yaml' },
+];
+---
+
+<div class="tlx-tabs" data-tabs>
+  <div class="tlx-tabs-list" role="tablist">
+    {tabs.map((t, i) => (
+      <button
+        type="button"
+        role="tab"
+        class="tlx-tab"
+        id={`tab-${t.id}`}
+        aria-controls={`panel-${t.id}`}
+        aria-selected={i === 0}
+        data-tab={t.id}
+      >
+        {t.label}
+      </button>
+    ))}
+  </div>
+  {tabs.map((t, i) => (
+    <div
+      role="tabpanel"
+      class="tlx-tab-panel"
+      id={`panel-${t.id}`}
+      aria-labelledby={`tab-${t.id}`}
+      data-panel={t.id}
+      hidden={i !== 0}
+    >
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:0.55rem;">
+        <code style="font-size:0.78rem; color:var(--tlx-fg-muted); background:transparent; border:none; padding:0;">{t.path}</code>
+        <button class="tlx-copy" type="button" data-copy={t.code} aria-label="Copy config">
+          <span data-label>Copy</span>
+        </button>
+      </div>
+      <pre data-language={t.lang}><code>{t.code}</code></pre>
+    </div>
+  ))}
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-tabs]').forEach((root) => {
+    const tabs = root.querySelectorAll<HTMLButtonElement>('[data-tab]');
+    const panels = root.querySelectorAll<HTMLElement>('[data-panel]');
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const id = tab.dataset.tab;
+        tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+        panels.forEach((p) => {
+          if (p.dataset.panel === id) p.removeAttribute('hidden');
+          else p.setAttribute('hidden', '');
+        });
+      });
+    });
+  });
+</script>

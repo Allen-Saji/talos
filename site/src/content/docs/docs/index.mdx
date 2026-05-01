@@ -1,0 +1,34 @@
+---
+title: Welcome
+description: Talos docs — install, embed, configure, extend.
+template: splash
+hero:
+  tagline: A self-hosted, vertical Ethereum agent. Daemon plus thin clients. Curated DeFi tools. Bring your own keys.
+  image:
+    file: ../../../assets/logo.png
+    alt: Talos
+  actions:
+    - text: Install
+      link: /docs/get-started/install
+      variant: primary
+    - text: Embed in Claude / Cursor / OpenClaw
+      link: /docs/channels/mcp
+      variant: secondary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Get started" icon="rocket">
+    Install, run `talos init`, and open the REPL. [Start here →](/docs/get-started/install)
+  </Card>
+  <Card title="Architecture" icon="puzzle">
+    Daemon, runtime, KeeperHub middleware, three-tier memory. [Read the design →](/docs/architecture/layer-cake)
+  </Card>
+  <Card title="Channels" icon="information">
+    CLI REPL, Telegram, MCP server. One brain, three faces. [Wire a channel →](/docs/channels/cli)
+  </Card>
+  <Card title="Tools" icon="setting">
+    Aave V3, Uniswap V3, Li.Fi, Blockscout, AgentKit, EVM-MCP. [Browse the catalogue →](/docs/tools/aave)
+  </Card>
+</CardGrid>

@@ -1,0 +1,46 @@
+---
+const tools = [
+  { name: 'Aave V3', kind: 'native', detail: 'supply · borrow · repay · withdraw', tools: 6, kh: 'mutates', href: '/docs/tools/aave' },
+  { name: 'Uniswap V3', kind: 'native', detail: 'quote · approve · exact-in swap', tools: 3, kh: 'mutates', href: '/docs/tools/uniswap' },
+  { name: 'Li.Fi', kind: 'native', detail: 'cross-chain bridge + quotes', tools: 5, kh: 'mutates', href: '/docs/tools/lifi' },
+  { name: 'Blockscout', kind: 'hosted MCP', detail: 'multi-chain block · contract · tx', tools: 25, kh: 'read-only', href: '/docs/tools/blockscout' },
+  { name: 'AgentKit', kind: 'MCP-as-source', detail: 'wallet · Pyth · Compound · Morpho', tools: 10, kh: 'annotation', href: '/docs/tools/agentkit' },
+  { name: 'EVM-MCP', kind: 'local MCP', detail: 'generic RPC · ENS · ERC-20/721', tools: 16, kh: 'annotation', href: '/docs/tools/evm-mcp' },
+];
+---
+
+<div class="tlx-grid tlx-grid--6">
+  {tools.map((t) => (
+    <a href={t.href} class="tlx-tool-card">
+      <div class="tlx-tool-card-head">
+        <h3 class="tlx-tool-card-name">{t.name}</h3>
+        <span class="tlx-tool-card-pill">{t.tools}</span>
+      </div>
+      <p class="tlx-tool-card-detail">{t.detail}</p>
+      <div class="tlx-tool-card-meta">
+        <span class="tlx-mono">{t.kind}</span>
+        <span class="tlx-mono" style="color:var(--tlx-fg-faint);">·</span>
+        <span class="tlx-mono">KH: {t.kh}</span>
+      </div>
+    </a>
+  ))}
+</div>
+
+<style>
+  .tlx-tool-card {
+    display: block;
+    background: var(--tlx-surface);
+    border: 1px solid var(--tlx-border);
+    border-radius: var(--tlx-radius-lg);
+    padding: 1.1rem 1.2rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  }
+  .tlx-tool-card:hover { border-color: var(--tlx-bronze); background: var(--tlx-surface-rise); }
+  .tlx-tool-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem; }
+  .tlx-tool-card-name { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; color: var(--tlx-fg-strong); }
+  .tlx-tool-card-pill { font-family: var(--sl-font-mono); font-size: 0.72rem; padding: 0.18rem 0.48rem; background: rgba(184,115,51,0.10); color: var(--tlx-bronze-bright); border: 1px solid rgba(184,115,51,0.25); border-radius: 999px; }
+  .tlx-tool-card-detail { margin: 0 0 0.7rem; font-size: 0.88rem; line-height: 1.5; color: var(--tlx-fg-muted); }
+  .tlx-tool-card-meta { font-size: 0.74rem; color: var(--tlx-fg-faint); display: flex; gap: 0.45rem; align-items: center; letter-spacing: 0.02em; }
+</style>

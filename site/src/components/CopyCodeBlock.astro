@@ -1,0 +1,40 @@
+---
+interface Props {
+  command: string;
+  prompt?: string;
+  label?: string;
+}
+const { command, prompt = '$', label } = Astro.props;
+---
+
+<div class="tlx-codeblock" role="group" aria-label={label ?? `Copy command ${command}`}>
+  <span class="tlx-codeblock-prompt" aria-hidden="true">{prompt}</span>
+  <span class="tlx-codeblock-cmd" data-language="bash">{command}</span>
+  <button class="tlx-copy" type="button" data-copy={command} aria-label="Copy command">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <rect x="4" y="4" width="9" height="10" rx="1.5"/>
+      <path d="M3 11V3a1 1 0 0 1 1-1h7"/>
+    </svg>
+    <span data-label>Copy</span>
+  </button>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.tlx-copy[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const text = btn.dataset.copy ?? '';
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.dataset.state = 'copied';
+        const lbl = btn.querySelector('[data-label]');
+        if (lbl) lbl.textContent = 'Copied';
+        setTimeout(() => {
+          delete btn.dataset.state;
+          if (lbl) lbl.textContent = 'Copy';
+        }, 1500);
+      } catch {
+        /* fallback: select + execCommand could go here, but modern browsers are fine */
+      }
+    });
+  });
+</script>

@@ -1,7 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
   "files": {
-    "includes": ["**", "!dist", "!drizzle/**/*.sql", "!drizzle/meta", "!node_modules", "!coverage"]
+    "includes": [
+      "**",
+      "!dist",
+      "!drizzle/**/*.sql",
+      "!drizzle/meta",
+      "!node_modules",
+      "!coverage",
+      "!site"
+    ]
   },
   "formatter": {
     "enabled": true,
