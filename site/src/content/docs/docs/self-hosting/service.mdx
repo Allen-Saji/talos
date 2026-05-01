@@ -1,0 +1,79 @@
+---
+title: launchd / systemd
+description: Run talosd as a user-level service.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`talos install-service` registers a user-level service unit. **No root**. The unit lives in your home directory.
+
+<Tabs>
+  <TabItem label="macOS (launchd)">
+    ```bash
+    talos install-service
+    ```
+
+    Writes `~/Library/LaunchAgents/com.allen.talosd.plist` and runs `launchctl load`.
+
+    ```bash
+    # Status
+    launchctl list | grep talosd
+
+    # Stop / start
+    launchctl unload ~/Library/LaunchAgents/com.allen.talosd.plist
+    launchctl load   ~/Library/LaunchAgents/com.allen.talosd.plist
+
+    # Remove
+    talos install-service --remove
+    ```
+
+    Logs go to `~/.config/talos/daemon.log`. Stdout/stderr from launchd are at `~/Library/Logs/com.allen.talosd.out.log`.
+  </TabItem>
+
+  <TabItem label="Linux (systemd-user)">
+    ```bash
+    talos install-service
+    ```
+
+    Writes `~/.config/systemd/user/talosd.service` and runs `systemctl --user daemon-reload && systemctl --user enable --now talosd`.
+
+    ```bash
+    # Status
+    systemctl --user status talosd
+
+    # Stop / start
+    systemctl --user stop talosd
+    systemctl --user start talosd
+
+    # Restart
+    systemctl --user restart talosd
+
+    # Logs
+    journalctl --user -u talosd -f
+
+    # Remove
+    talos install-service --remove
+    ```
+
+    Enable lingering if you want `talosd` to keep running after logout:
+
+    ```bash
+    sudo loginctl enable-linger $USER
+    ```
+
+    (This is the only step that needs sudo, and it's optional.)
+  </TabItem>
+</Tabs>
+
+## What the unit does
+
+| Lifecycle | Action |
+|---|---|
+| Start | `talosd` |
+| Restart | on failure, with 10s backoff |
+| Stop | SIGTERM, 30s drain timeout |
+| Env | reads `<install>/.env` and the user shell env |
+
+## Conflict with `pnpm dev:daemon`
+
+If the service is running and you `pnpm dev:daemon` in another terminal, the dev daemon will fail with `EADDRINUSE`. Stop the service first or change `TALOS_PORT`.

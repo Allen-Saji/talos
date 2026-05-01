@@ -1,0 +1,98 @@
+---
+title: MCP server
+description: Drop Talos into Claude Desktop, Cursor, or OpenClaw as an MCP server.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Talos exposes itself as an MCP (Model Context Protocol) server. Once wired into your host, your agent can call `eth_action`, `query_eth_knowledge`, `eth_status`, and `talos_new_thread`.
+
+## Why this exists
+
+Claude Desktop, Cursor, OpenClaw, Hermes — they all speak MCP. Drop Talos in once and the host's assistant knows how to act on Ethereum.
+
+The MCP server is a stdio-to-WebSocket proxy that connects back to `talosd`. The proxy is the thin client; the daemon is the brain.
+
+## Wiring it up
+
+Pick your host:
+
+<Tabs>
+  <TabItem label="Claude Desktop">
+    Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+    ```json
+    {
+      "mcpServers": {
+        "talos": {
+          "command": "npx",
+          "args": ["talos", "serve", "--mcp"]
+        }
+      }
+    }
+    ```
+
+    Restart Claude Desktop. You'll see `talos` in the MCP indicator.
+  </TabItem>
+  <TabItem label="Cursor">
+    Edit `~/.cursor/mcp.json`:
+
+    ```json
+    {
+      "mcpServers": {
+        "talos": {
+          "command": "npx",
+          "args": ["talos", "serve", "--mcp"]
+        }
+      }
+    }
+    ```
+
+    Reload Cursor. The new MCP shows in the chat sidebar.
+  </TabItem>
+  <TabItem label="OpenClaw">
+    Edit `~/.openclaw/mcp.yaml`:
+
+    ```yaml
+    mcpServers:
+      talos:
+        command: npx
+        args: [talos, serve, --mcp]
+    ```
+
+    OpenClaw picks up the change live; no restart needed.
+  </TabItem>
+  <TabItem label="Hermes / Generic">
+    Hermes uses a manifest-style config. The transport is stdio. Command and args are identical:
+
+    ```bash
+    npx talos serve --mcp
+    ```
+
+    Spawn that as your MCP child process. Talos reads/writes the standard MCP framing on stdin/stdout.
+  </TabItem>
+</Tabs>
+
+## Tools exposed
+
+| Tool | Description |
+|---|---|
+| `query_eth_knowledge` | Hybrid retrieval over the local knowledge base. Returns chunks + citations. |
+| `eth_action` | Runs the full Talos agent loop. Streams progress to the host as MCP `notifications/progress`. |
+| `eth_status` | Wallet, chains, last-sync time, enabled MCPs. |
+| `talos_new_thread` | Resets the host's session thread. |
+
+## Thread keying
+
+MCP threads key as `mcp:{pid}:{startedAt}`. **Per host session.** Each Claude Desktop launch is a new thread; cross-thread recall (cosine ≥ 0.78, top-3) bridges back to your CLI and Telegram history.
+
+## What the host sees
+
+```
+< notifications/progress { stepId: 1, kind: "tool_call", tool: "uniswap_get_quote" }
+< notifications/progress { stepId: 1, kind: "tool_result", ok: true }
+< notifications/progress { stepId: 2, kind: "text_delta", text: "Swapped 0.001 ETH for 2.59 USDC..." }
+< response { ok: true, runId: "run_a8c7..." }
+```
+
+Hosts that render MCP progress (Claude Desktop, Cursor) show the live trace. Hosts that don't, just see the final result.

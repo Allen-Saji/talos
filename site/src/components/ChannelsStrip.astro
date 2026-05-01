@@ -1,0 +1,57 @@
+---
+const items = [
+  {
+    label: 'CLI',
+    title: 'talos repl',
+    sub: 'WebSocket REPL',
+    snippet: [
+      { p: '$', t: 'talos repl' },
+      { p: '↳', t: 'connected to talosd ws://127.0.0.1:7711', m: true },
+      { p: '>', t: 'wallet balance' },
+      { p: '✓', t: '0.0086 ETH on sepolia', ok: true },
+    ],
+  },
+  {
+    label: 'Telegram',
+    title: 'grammY bot',
+    sub: 'edit-in-place streaming',
+    snippet: [
+      { p: '@you', t: '/run swap 0.001 ETH for USDC' },
+      { p: '🤖', t: '↳ uniswap_get_quote ✓ ~2.59 USDC', m: true },
+      { p: '🤖', t: '↳ uniswap_swap_exact_in', m: true },
+      { p: '🤖', t: '✓ tx 0x17643319… confirmed', ok: true },
+    ],
+  },
+  {
+    label: 'MCP server',
+    title: 'talos serve --mcp',
+    sub: 'stdio↔WS proxy',
+    snippet: [
+      { p: '#', t: 'imported by Claude Desktop / Cursor / OpenClaw', m: true },
+      { p: '→', t: 'eth_action({ intent: "supply 2 USDC to aave" })' },
+      { p: '↳', t: 'workflow wf_b71f… → tx 0x9c2d…', m: true },
+      { p: '✓', t: 'aUSDC position earning variable yield', ok: true },
+    ],
+  },
+];
+---
+
+<div class="tlx-grid tlx-grid--3">
+  {items.map((c) => (
+    <article class="tlx-card">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:0.55rem;">
+        <h3 class="tlx-card-title">{c.label}</h3>
+        <span class="tlx-mono" style="color:var(--tlx-fg-muted); font-size:0.78rem;">{c.sub}</span>
+      </div>
+      <p class="tlx-card-body" style="margin-bottom:0.85rem;"><span class="tlx-mono" style="color:var(--tlx-bronze-bright)">{c.title}</span></p>
+      <pre class="tlx-term">
+        {c.snippet.map((s) => (
+          <div>
+            <span class={s.ok ? 'tlx-term-ok' : s.m ? 'tlx-term-out' : 'tlx-term-prompt'}>{s.p}</span>
+            <span style="margin-left:0.5em;">{s.t}</span>
+          </div>
+        ))}
+      </pre>
+    </article>
+  ))}
+</div>

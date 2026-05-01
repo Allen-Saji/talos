@@ -1,0 +1,32 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="tlx-footer">
+  <div class="tlx-container tlx-footer-inner">
+    <div class="tlx-footer-brand">
+      <span class="tlx-mark" aria-hidden="true"></span>
+      <span style="color:var(--tlx-fg); font-weight: 600; letter-spacing: -0.01em;">Talos</span>
+      <span style="color:var(--tlx-fg-faint);">·</span>
+      <span>Built for <a href="https://ethglobal.com/events/open-agents">ETHGlobal Open Agents</a></span>
+    </div>
+    <div class="tlx-footer-links">
+      <a href="https://github.com/Allen-Saji/talos">GitHub</a>
+      <a href="/docs/get-started/overview">Docs</a>
+      <a href="/llms.txt"><span class="tlx-mono">llms.txt</span></a>
+      <a href="/sitemap-index.xml"><span class="tlx-mono">sitemap</span></a>
+      <a href="https://github.com/Allen-Saji/talos/blob/main/LICENSE">MIT</a>
+      <span style="color:var(--tlx-fg-faint);">© {year} Allen Saji</span>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .tlx-footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap; }
+  .tlx-footer-brand { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .tlx-footer-links { display: flex; gap: 1.1rem; align-items: center; flex-wrap: wrap; }
+  @media (max-width: 720px) {
+    .tlx-footer-inner { flex-direction: column; align-items: flex-start; gap: 0.9rem; }
+    .tlx-footer-links { gap: 0.85rem; }
+  }
+</style>

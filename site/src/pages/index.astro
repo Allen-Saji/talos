@@ -1,0 +1,319 @@
+---
+import { Image } from 'astro:assets';
+import logo from '@/assets/logo.png';
+import '@/styles/theme.css';
+import CopyCodeBlock from '@/components/CopyCodeBlock.astro';
+import MCPHostTabs from '@/components/MCPHostTabs.astro';
+import LayerCake from '@/components/LayerCake.astro';
+import ToolGrid from '@/components/ToolGrid.astro';
+import ChannelsStrip from '@/components/ChannelsStrip.astro';
+import Footer from '@/components/Footer.astro';
+
+const title = 'Talos · A self-hosted Ethereum agent';
+const description = 'Daemon plus thin clients. Curated DeFi tools. Daily-fresh ecosystem knowledge. Bring your own keys. Your wallet never leaves your machine.';
+const SITE = 'https://talos.allensaji.dev';
+const og = `${SITE}/og.png`;
+const ogAlt = 'Talos — a bronze automaton holding a sword, an Ethereum diamond on its chest, set against a dusk horizon.';
+const canonical = new URL(Astro.url.pathname, SITE).toString();
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{title}</title>
+  <meta name="description" content={description}/>
+  <link rel="canonical" href={canonical}/>
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"/>
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"/>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="Talos"/>
+  <meta property="og:title" content={title}/>
+  <meta property="og:description" content={description}/>
+  <meta property="og:url" content={canonical}/>
+  <meta property="og:locale" content="en_US"/>
+  <meta property="og:image" content={og}/>
+  <meta property="og:image:secure_url" content={og}/>
+  <meta property="og:image:type" content="image/png"/>
+  <meta property="og:image:width" content="1200"/>
+  <meta property="og:image:height" content="630"/>
+  <meta property="og:image:alt" content={ogAlt}/>
+
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@SajiBhai011"/>
+  <meta name="twitter:creator" content="@SajiBhai011"/>
+  <meta name="twitter:title" content={title}/>
+  <meta name="twitter:description" content={description}/>
+  <meta name="twitter:image" content={og}/>
+  <meta name="twitter:image:alt" content={ogAlt}/>
+</head>
+<body class="tlx-landing">
+
+  <!-- Top nav -->
+  <header class="tlx-topnav">
+    <div class="tlx-container tlx-topnav-inner">
+      <a href="/" class="tlx-topnav-brand" aria-label="Talos">
+        <span class="tlx-mark" aria-hidden="true"></span>
+        <span class="tlx-wordmark">Talos</span>
+      </a>
+      <nav class="tlx-topnav-links">
+        <a href="/docs/get-started/overview">Docs</a>
+        <a href="#tools">Tools</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#channels">Channels</a>
+        <a href="https://github.com/Allen-Saji/talos" class="tlx-topnav-gh" aria-label="GitHub">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.93c.58.1.79-.25.79-.55v-2c-3.2.7-3.87-1.37-3.87-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.38.97.1-.75.4-1.27.74-1.56-2.55-.29-5.23-1.27-5.23-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.17a10.93 10.93 0 0 1 5.74 0c2.18-1.48 3.14-1.17 3.14-1.17.62 1.58.23 2.75.12 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.06.78 2.13v3.16c0 .31.2.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/>
+          </svg>
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="tlx-hero">
+    <div class="tlx-halo" aria-hidden="true"></div>
+    <div class="tlx-container tlx-hero-inner">
+      <div class="tlx-hero-copy">
+        <span class="tlx-eyebrow">A self-hosted Ethereum agent</span>
+        <h1 class="tlx-h1">The bronze automaton<br/>for your wallet.</h1>
+        <p class="tlx-lead">Daemon plus thin clients. Curated DeFi tools. Daily-fresh ecosystem knowledge. Bring your own keys — your wallet never leaves your machine.</p>
+
+        <div class="tlx-hero-cta">
+          <CopyCodeBlock command="npx talos init" />
+          <a class="tlx-btn tlx-btn--primary" href="/docs/get-started/overview">Read the docs →</a>
+          <a class="tlx-btn" href="https://github.com/Allen-Saji/talos">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.93c.58.1.79-.25.79-.55v-2c-3.2.7-3.87-1.37-3.87-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.38.97.1-.75.4-1.27.74-1.56-2.55-.29-5.23-1.27-5.23-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.17a10.93 10.93 0 0 1 5.74 0c2.18-1.48 3.14-1.17 3.14-1.17.62 1.58.23 2.75.12 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.06.78 2.13v3.16c0 .31.2.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+            Star on GitHub
+          </a>
+        </div>
+
+        <p class="tlx-hero-meta">
+          <span><span class="tlx-dot tlx-dot--ok"></span> 424 tests passing</span>
+          <span><span class="tlx-dot"></span> Node 22 · MIT · ETHGlobal Open Agents</span>
+        </p>
+      </div>
+
+      <div class="tlx-hero-art" aria-hidden="false">
+        <Image src={logo} alt="Talos — a bronze automaton holding a sword, an Ethereum diamond on its chest, set against a dusk horizon." width={520} height={520} loading="eager" fetchpriority="high"/>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3-up tiles -->
+  <section class="tlx-section">
+    <div class="tlx-container">
+      <div class="tlx-grid tlx-grid--3">
+        <article class="tlx-card">
+          <div class="tlx-card-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h18M3 12h18M3 16h12"/></svg>
+          </div>
+          <h3 class="tlx-card-title">Vertical, not general</h3>
+          <p class="tlx-card-body">First-party tools for Aave V3, Uniswap V3, Li.Fi, Blockscout, AgentKit, and a generic EVM MCP. Namespaced, annotation-routed. No invented contract addresses.</p>
+        </article>
+        <article class="tlx-card">
+          <div class="tlx-card-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" opacity="0.55"/><circle cx="12" cy="12" r="11" opacity="0.3"/></svg>
+          </div>
+          <h3 class="tlx-card-title">Three-tier memory</h3>
+          <p class="tlx-card-body">Hot last-20 runs, warm thread summaries every 20 turns, cold cross-thread semantic recall at cosine ≥ 0.78. PGLite + pgvector + tsvector hybrid retrieval.</p>
+        </article>
+        <article class="tlx-card">
+          <div class="tlx-card-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 4.5-3.5 8-8 9-4.5-1-8-4.5-8-9V7l8-4z"/></svg>
+          </div>
+          <h3 class="tlx-card-title">Audit-by-default</h3>
+          <p class="tlx-card-body">Every chain-mutating tool routes through KeeperHub workflows. A read-only allowlist bypasses the audit hop. Tools that don't declare themselves are routed.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick MCP integration -->
+  <section class="tlx-section" id="embed">
+    <div class="tlx-container">
+      <span class="tlx-eyebrow">Embed it</span>
+      <h2 class="tlx-section-title">Drop Talos into your assistant.</h2>
+      <p class="tlx-section-sub">Talos exposes itself as an MCP server. Paste this snippet into your host config — it's the same on every host.</p>
+      <MCPHostTabs />
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="tlx-section" id="architecture">
+    <div class="tlx-container">
+      <span class="tlx-eyebrow">Architecture</span>
+      <h2 class="tlx-section-title">Daemon plus thin clients.</h2>
+      <p class="tlx-section-sub">One process owns the database, the runtime, the MCP host, and the wallet. Everything else is a thin client over WebSocket.</p>
+      <LayerCake />
+      <p style="margin: 1.25rem 0 0; color: var(--tlx-fg-muted); font-size: 0.92rem;">
+        Read the full design — schemas, event taxonomy, retrieval strategy, daemon lifecycle, audit-by-default contract — in <a href="/docs/architecture/layer-cake" style="color:var(--tlx-bronze-bright);">the architecture docs</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- Tool catalogue -->
+  <section class="tlx-section" id="tools">
+    <div class="tlx-container">
+      <span class="tlx-eyebrow">Tool catalogue</span>
+      <h2 class="tlx-section-title">Six sources, one tool surface.</h2>
+      <p class="tlx-section-sub">Each card is one source. Native means custom-built; MCP-as-source means a vendor MCP cherry-picked into Talos's namespace.</p>
+      <ToolGrid />
+    </div>
+  </section>
+
+  <!-- Channels strip -->
+  <section class="tlx-section" id="channels">
+    <div class="tlx-container">
+      <span class="tlx-eyebrow">Channels</span>
+      <h2 class="tlx-section-title">One brain. Three faces.</h2>
+      <p class="tlx-section-sub">CLI REPL for the terminal, Telegram for the phone, MCP server for any host. They share one wallet, one knowledge base, one memory store.</p>
+      <ChannelsStrip />
+    </div>
+  </section>
+
+  <!-- KH stripe -->
+  <section class="tlx-section" id="keeperhub">
+    <div class="tlx-container">
+      <div class="tlx-stripe">
+        <div class="tlx-stripe-text">
+          <span class="tlx-pill">KeeperHub</span>
+          <p style="margin: 0.7rem 0 0;"><strong>Audit-by-default execution.</strong></p>
+          <small>Every mutating tool call routes through a KeeperHub workflow. Receipts written to the local DB. Read-only calls bypass the hop. Talos is the reference "OpenClaw connector" for the KeeperHub track at ETHGlobal Open Agents.</small>
+        </div>
+        <div style="display:flex; gap:0.6rem;">
+          <a class="tlx-btn" href="https://keeperhub.com">KeeperHub →</a>
+          <a class="tlx-btn tlx-btn--primary" href="/docs/architecture/keeperhub">How it works</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <Footer />
+
+  <style>
+    /* Top nav */
+    .tlx-topnav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(10,10,12,0.78);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--tlx-border);
+    }
+    .tlx-topnav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+    .tlx-topnav-brand {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-weight: 600;
+      color: var(--tlx-fg-strong);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+    .tlx-topnav-links {
+      display: flex; align-items: center; gap: 1.4rem;
+    }
+    .tlx-topnav-links a {
+      color: var(--tlx-fg-muted);
+      text-decoration: none;
+      font-size: 0.92rem;
+      transition: color 120ms ease;
+      white-space: nowrap;
+    }
+    .tlx-topnav-links a:hover { color: var(--tlx-fg-strong); }
+    .tlx-topnav-gh { display: inline-flex; align-items: center; }
+    @media (max-width: 720px) { .tlx-topnav-links a:not(.tlx-topnav-gh):not([href="/docs/get-started/overview"]) { display: none; } }
+
+    /* Hero */
+    .tlx-hero {
+      position: relative;
+      overflow: hidden;
+      padding: 4rem 0 5.5rem;
+    }
+    .tlx-hero-inner {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 4rem;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+    .tlx-hero-copy { display: flex; flex-direction: column; gap: 1.1rem; }
+    .tlx-hero-copy .tlx-h1 { margin-top: 0.6rem; }
+    .tlx-hero-copy .tlx-lead { margin-top: 0.4rem; }
+    .tlx-hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-top: 1.4rem;
+    }
+    .tlx-hero-cta > .tlx-codeblock { flex: 1 1 240px; min-width: 0; }
+    .tlx-hero-meta {
+      margin: 1.6rem 0 0;
+      display: flex;
+      gap: 1.4rem;
+      color: var(--tlx-fg-muted);
+      font-size: 0.84rem;
+      flex-wrap: wrap;
+    }
+    .tlx-hero-meta span { display: inline-flex; align-items: center; gap: 0.5rem; }
+    .tlx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tlx-fg-faint); display: inline-block; }
+    .tlx-dot--ok { background: var(--tlx-ok); box-shadow: 0 0 8px rgba(93,155,106,0.55); }
+
+    .tlx-hero-art {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tlx-hero-art::before {
+      content: '';
+      position: absolute;
+      inset: 8% 8% 8% 8%;
+      background: radial-gradient(closest-side, rgba(184,115,51,0.28), transparent 70%);
+      filter: blur(20px);
+      z-index: 0;
+    }
+    .tlx-hero-art :global(img) {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: auto;
+      max-width: 480px;
+      border-radius: 14px;
+      box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px var(--tlx-border);
+    }
+
+    /* Tile icon */
+    .tlx-card-icon {
+      display: inline-flex;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      align-items: center;
+      justify-content: center;
+      background: rgba(184,115,51,0.10);
+      border: 1px solid rgba(184,115,51,0.25);
+      color: var(--tlx-bronze-bright);
+      margin-bottom: 0.75rem;
+    }
+
+    @media (max-width: 900px) {
+      .tlx-hero-inner { grid-template-columns: 1fr; gap: 2.5rem; }
+      .tlx-hero-art { order: -1; }
+      .tlx-hero-art :global(img) { max-width: 280px; }
+      .tlx-hero { padding: 2rem 0 3rem; }
+    }
+  </style>
+</body>
+</html>

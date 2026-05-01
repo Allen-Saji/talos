@@ -1,0 +1,54 @@
+---
+title: Layer cake
+description: How talosd, the runtime, persistence, the wallet, and the hot MCP host fit together.
+---
+
+```
+                     ┌──────────────────────────────────────────────┐
+                     │  Thin clients                                │
+                     │   talos repl  │  Telegram  │  MCP hosts     │
+                     └─────┬─────────────┬─────────────┬────────────┘
+                           │ WS:7711     │ in-process  │ stdio + WS
+                           ▼             ▼             ▼
+        ┌────────────────────────────────────────────────────────┐
+        │  talosd  (always-running daemon, launchd/systemd)      │
+        │                                                        │
+        │  ┌─ Channel adapters ────────────────────────────────┐ │
+        │  │  cli-ws    │   telegram   │   mcp-server         │ │
+        │  └───────────────────────────────────────────────────┘ │
+        │                                                        │
+        │  ┌─ Runtime (Vercel AI SDK v6) ─────────────────────┐ │
+        │  │  Provider router  │  Agent registry              │ │
+        │  │  Memory manager   │  Prompt builder              │ │
+        │  │  Agent loop (streamText) + middleware            │ │
+        │  └───────────────────────────────────────────────────┘ │
+        │                                                        │
+        │  ┌─ KeeperHub middleware ───────────────────────────┐ │
+        │  │  Annotation-driven routing │ audit-by-default    │ │
+        │  └───────────────────────────────────────────────────┘ │
+        ├────────────────────────────────────────────────────────┤
+        │  PGLite + Drizzle  (knowledge + conversations)         │
+        ├────────────────────────────────────────────────────────┤
+        │  Wallet (viem) + nightly knowledge cron                │
+        ├────────────────────────────────────────────────────────┤
+        │  Hot MCP tool servers                                  │
+        │   AgentKit  │  Blockscout  │  EVM  │  Li.Fi           │
+        │   Aave (native)  │  Uniswap V3 (native)               │
+        └────────────────────────────────────────────────────────┘
+```
+
+## Locked decisions
+
+| # | Decision | Choice |
+|---|---|---|
+| 1 | Agent loop substrate | Vercel AI SDK **v6** (`ai` ≥ 6.0, `@ai-sdk/mcp` for MCP client) |
+| 2 | Persistence | PGLite single store (knowledge + conversations) |
+| 3 | ORM | Drizzle (schema-as-TS, auto-generated migrations) |
+| 4 | Embedding model | OpenAI `text-embedding-3-small` (1536-dim) |
+| 5 | Retrieval | Hybrid: pgvector (HNSW) + tsvector (GIN) |
+| 6 | Cross-thread recall | Adaptive: cosine ≥ 0.78, top-3, always-search |
+| 7 | Summarization trigger | Turn count: every 20 runs |
+| 8 | LLM call style | `streamText` everywhere |
+| 9 | KeeperHub default | **Audit-by-default** — undeclared tools routed |
+
+For the full design — schemas, event taxonomy, retrieval strategy, daemon lifecycle, audit-by-default contract — see [`docs/architecture.md`](https://github.com/Allen-Saji/talos/blob/main/docs/architecture.md) in the repo.
