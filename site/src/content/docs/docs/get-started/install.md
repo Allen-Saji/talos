@@ -7,19 +7,30 @@ description: Install Talos from source. Node 22+, pnpm 9+, an OpenAI API key.
 
 - **Node.js** ≥ 22
 - **pnpm** ≥ 9
+- **git**
 - An **OpenAI API key** (BYOK — Talos never sees keys you don't paste in)
 
-## Install from source
+## Install (one-liner)
+
+```bash
+curl -fsSL https://talos.allensaji.dev/install.sh | bash
+```
+
+Installs to `~/.local/share/talos`, builds, and links `talos` globally. Override the location with `TALOS_DIR=...`.
+
+:::note
+npm publish is on the roadmap. The package name is TBD because `talos` collides with Talos Linux on npm. Until then, the installer above (or the manual path below) is the canonical install.
+:::
+
+## Install from source (manual)
 
 ```bash
 git clone https://github.com/Allen-Saji/talos.git
 cd talos
 pnpm install
+pnpm build
+pnpm link --global
 ```
-
-:::note
-npm publish is on the roadmap. The package name is TBD because `talos` collides with Talos Linux on npm. Until then, install from source.
-:::
 
 ## Verify
 
@@ -28,15 +39,11 @@ pnpm typecheck
 pnpm test
 ```
 
-Expect all 35 test files green and ~424 individual tests passing.
+Expect 35 test files green and 425+ individual tests passing.
 
-## Build
+## Binaries
 
-```bash
-pnpm build
-```
-
-Produces two binaries in `dist/bin/`:
+`pnpm build` produces two entrypoints in `dist/bin/`:
 
 | Binary | Role |
 |---|---|
