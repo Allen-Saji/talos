@@ -31,7 +31,7 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 - **F2.1** P0 KeeperHub MCP wired in via `https://app.keeperhub.com/mcp`
 - **F2.2** P0 Every agent tx routed through `create_workflow` + `execute_workflow` for audit trail
 - **F2.3** P0 `@keeperhub/wallet` x402 hook installed for outbound paid API calls (Base)
-- **F2.4** P0 Audit log surface: `get_execution_logs` exposed via CLI command
+- **F2.4** P0 Audit log surface: `get_direct_execution_status` exposed via CLI for direct executions (the path the audit middleware uses; arg `execution_id`, snake_case). `get_execution_logs` is workflow-only and uses `executionId` (camelCase).
 - **F2.5** P1 Daily knowledge cron uses KeeperHub Schedule trigger instead of local cron
 - **F2.6** P1 Spending guardrails: per-day cap, per-tx cap, configurable
 - **F2.7** P2 Submit feedback bounty entry ($500 builder feedback prize)
