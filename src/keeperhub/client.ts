@@ -191,6 +191,12 @@ export async function createKeeperHubClient(opts: KeeperHubClientOpts): Promise<
 
   function asExecutionResult(raw: unknown): ExecutionResult {
     log.info({ raw, rawType: typeof raw }, 'KeeperHub raw execution response (pre-parse)')
+    if (typeof raw === 'string') {
+      // KH surfaces tool-level failures as MCP error strings (e.g. schema-validation
+      // rejections). Treat these as failed executions so the middleware throws
+      // and the agent sees a real error instead of an empty `pending` shell.
+      return { executionId: '', status: 'failed', error: raw, output: raw }
+    }
     if (typeof raw !== 'object' || raw === null) {
       return { executionId: '', status: 'pending', output: raw }
     }
@@ -243,7 +249,21 @@ export async function createKeeperHubClient(opts: KeeperHubClientOpts): Promise<
     },
     callTool,
     async executeContractCall(input) {
-      return asExecutionResult(await callTool('execute_contract_call', input))
+      // KH's `execute_contract_call` schema requires `function_args` and `abi`
+      // as JSON strings (not arrays/objects). Serialize before sending so each
+      // protocol route can keep building structured payloads.
+      const payload: Record<string, unknown> = {
+        network: input.network,
+        contract_address: input.contract_address,
+        function_name: input.function_name,
+      }
+      if (input.function_args !== undefined) {
+        payload.function_args = JSON.stringify(input.function_args)
+      }
+      if (input.abi !== undefined) {
+        payload.abi = JSON.stringify(input.abi)
+      }
+      return asExecutionResult(await callTool('execute_contract_call', payload))
     },
     async executeTransfer(input) {
       return asExecutionResult(await callTool('execute_transfer', input))
