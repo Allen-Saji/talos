@@ -7,6 +7,7 @@ import {
   type AuthServerMetadata,
   discoverAuthServer,
   refreshToken as refreshTokenRpc,
+  type TokenResponse,
 } from './oauth'
 import { EXPIRY_BUFFER_MS, isExpired, loadSession, saveSession, sessionFromResponse } from './token'
 
@@ -109,17 +110,41 @@ export async function createKeeperHubClient(opts: KeeperHubClientOpts): Promise<
     }
     const meta = await authMetadata()
     log.info({ msUntilExpiry: session.expiresAt - Date.now() }, 'refreshing KeeperHub token')
-    const tokenRes = await refreshTokenRpc({
-      fetch: fetchImpl,
-      meta,
-      clientId: session.client.client_id,
-      ...(session.client.client_secret !== undefined
-        ? { clientSecret: session.client.client_secret }
-        : {}),
-      refreshToken: session.refreshToken,
-    })
+    let tokenRes: TokenResponse
+    try {
+      tokenRes = await refreshTokenRpc({
+        fetch: fetchImpl,
+        meta,
+        clientId: session.client.client_id,
+        ...(session.client.client_secret !== undefined
+          ? { clientSecret: session.client.client_secret }
+          : {}),
+        refreshToken: session.refreshToken,
+      })
+    } catch (err) {
+      log.error(
+        { err, clientId: session.client.client_id },
+        'KeeperHub token refresh failed — re-run `talos init` to re-auth',
+      )
+      throw err
+    }
     session = sessionFromResponse(session.client, tokenRes)
     await saveSession(opts.tokenPath, session)
+    const newMsUntilExpiry = session.expiresAt - Date.now()
+    if (newMsUntilExpiry <= 0) {
+      log.warn(
+        { newMsUntilExpiry, expiresAt: session.expiresAt },
+        'KeeperHub refresh returned an already-expired token — server clock skew or short TTL',
+      )
+    } else {
+      log.info(
+        {
+          newMsUntilExpiry,
+          newRefreshToken: tokenRes.refresh_token ? 'rotated' : 'unchanged',
+        },
+        'KeeperHub token refreshed',
+      )
+    }
     return session.accessToken
   }
 
