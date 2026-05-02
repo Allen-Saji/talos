@@ -203,6 +203,17 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     )
   }
 
+  // Operators can force mutate routing off (KEEPERHUB_DISABLE_MUTATES=true) to
+  // bypass an unhealthy upstream while keeping audit logging intact. Mutate
+  // tools fall through to direct viem execute; audit rows still get written.
+  const khMutatesDisabled = env.KEEPERHUB_DISABLE_MUTATES
+  if (khMutatesDisabled && khClient) {
+    logger.info(
+      'KEEPERHUB_DISABLE_MUTATES=true — mutate tools will execute directly via viem (audit logging still active)',
+    )
+  }
+  const khForMiddleware = khMutatesDisabled ? undefined : khClient
+
   // Per-run middleware factory. Bound at boot to db + annotation lookup +
   // optional KH client/routes; the runtime calls it per run with the runId so
   // audit rows carry the right run context. Single writer for `tool_calls`.
@@ -211,7 +222,7 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
       db: dbHandle.db,
       runContext: () => ctx,
       annotations: annotationLookup,
-      ...(khClient ? { kh: { client: khClient, routes } } : {}),
+      ...(khForMiddleware ? { kh: { client: khForMiddleware, routes } } : {}),
     })
 
   // Build runtime deps. Summarizer / fact pipeline still deferred (#16/#17).
