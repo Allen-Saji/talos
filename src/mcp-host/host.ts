@@ -262,6 +262,18 @@ export class McpHost {
           transport: transport as MCPTransport | HttpTransportConfig,
           name: `talos-${config.name}`,
           onUncaughtError: (err) => {
+            // Some stdio MCP servers (e.g. mcpdotdirect/evm-mcp-server) print
+            // a startup banner to stdout before their first JSON-RPC frame.
+            // The transport JSON.parses every line and throws SyntaxError on
+            // the banner. The actual connection completes a beat later, so
+            // these are benign — log at debug, don't mark unhealthy.
+            if (err instanceof SyntaxError && /Unexpected token/.test(err.message)) {
+              log.debug(
+                { err, server: name },
+                'MCP stdio non-JSON line ignored (likely a startup banner)',
+              )
+              return
+            }
             log.error({ err, server: name }, 'uncaught MCP error — marking unhealthy')
             this.markUnhealthy(name, err instanceof Error ? err.message : String(err))
           },
