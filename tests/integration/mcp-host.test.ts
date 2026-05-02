@@ -301,6 +301,23 @@ describe('McpHost', () => {
     await host.stop()
   })
 
+  it('ignores stdio JSON.parse SyntaxErrors (server startup banners)', async () => {
+    // Some stdio MCP servers print a banner before the first JSON-RPC frame.
+    // The transport throws SyntaxError on the banner; we should NOT mark
+    // the server unhealthy, since the connection completes a beat later.
+    const host = new McpHost()
+    await host.start([{ name: 'evmmcp', transport: 'http', url: 'https://mcp.evmmcp.com' }])
+    expect(host.isServerHealthy('evmmcp')).toBe(true)
+
+    const handler = lastOnUncaughtError()
+    handler?.(new SyntaxError('Unexpected token \'S\', "Starting EVM..."... is not valid JSON'))
+
+    expect(host.isServerHealthy('evmmcp')).toBe(true)
+    expect(host.getServerHealth().evmmcp?.lastError).toBeUndefined()
+
+    await host.stop()
+  })
+
   it('applies staticAnnotations overrides during registration', async () => {
     mockCreateMCPClient.mockResolvedValueOnce({
       tools: vi.fn().mockResolvedValue({

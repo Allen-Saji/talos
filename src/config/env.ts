@@ -1,6 +1,14 @@
-import 'dotenv/config'
+import path from 'node:path'
+import { config as loadDotenv } from 'dotenv'
 import { z } from 'zod'
+import { paths } from '@/config/paths'
 import { TalosConfigError } from '@/shared/errors'
+
+// Load configDir/.env first (the canonical location the wizard writes to).
+// Then CWD/.env with default override:false — dev-time project-root .env can
+// add extras but won't shadow values the wizard placed under ~/.config/talos.
+loadDotenv({ path: path.join(paths.configDir, '.env') })
+loadDotenv()
 
 /** Coerce empty string to undefined (dotenv sets VAR= as "") */
 const optionalUrl = z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional())
@@ -9,6 +17,26 @@ const optionalNonEmpty = z.preprocess(
   (v) => (v === '' ? undefined : v),
   z.string().min(1).optional(),
 )
+
+/**
+ * String-aware boolean for env vars. `z.coerce.boolean()` is a footgun: every
+ * non-empty string (including the literal "false") coerces to `true`. This
+ * parser respects "true|1|yes|on" / "false|0|no|off" with a configurable
+ * default for missing/empty values.
+ */
+function envBool(def: boolean): z.ZodType<boolean> {
+  return z
+    .preprocess((v) => {
+      if (v === undefined || v === null || v === '') return def
+      if (typeof v === 'boolean') return v
+      if (typeof v !== 'string') return Boolean(v)
+      const s = v.trim().toLowerCase()
+      if (s === 'true' || s === '1' || s === 'yes' || s === 'on') return true
+      if (s === 'false' || s === '0' || s === 'no' || s === 'off') return false
+      return def
+    }, z.boolean())
+    .default(def)
+}
 
 const EnvSchema = z.object({
   OPENAI_API_KEY: optionalNonEmpty,
@@ -42,9 +70,9 @@ const EnvSchema = z.object({
     .min(1)
     .default(24 * 60 * 60 * 1000),
   /** Disable the knowledge cron entirely (tests, dev). */
-  KNOWLEDGE_CRON_DISABLE: z.coerce.boolean().default(false),
+  KNOWLEDGE_CRON_DISABLE: envBool(false),
   /** Run the knowledge cron once at boot — used by `talos init`'s sync first-fetch. */
-  KNOWLEDGE_CRON_RUN_ON_BOOT: z.coerce.boolean().default(false),
+  KNOWLEDGE_CRON_RUN_ON_BOOT: envBool(false),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 

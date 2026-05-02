@@ -102,6 +102,34 @@ describe('ensureDaemonRunning — needs spawn', () => {
     expect(calls).toBe(1)
   })
 
+  it('spawns dev-mode .ts paths through tsx (not as a bare binary)', async () => {
+    type SpawnerFn = (cmd: string, args: string[], options: Record<string, unknown>) => ChildProcess
+    const fakeSpawner = vi.fn<SpawnerFn>(() => {
+      const fakeChild = new EventEmitter() as unknown as ChildProcess
+      ;(fakeChild as { pid: number }).pid = 99998
+      ;(fakeChild as { unref: () => void }).unref = () => {}
+      return fakeChild
+    })
+
+    await expect(
+      ensureDaemonRunning({
+        url: 'ws://127.0.0.1:1',
+        paths: {
+          pidPath: path.join(tmpDir, 'daemon.pid'),
+          logPath: path.join(tmpDir, 'talos.log'),
+        },
+        binPath: '/some/repo/bin/talosd.ts',
+        spawner: fakeSpawner,
+        bootTimeoutMs: 500,
+        probeTimeoutMs: 100,
+      }),
+    ).rejects.toThrow(/failed to come up/)
+
+    const [cmd, args] = fakeSpawner.mock.calls[0] ?? []
+    expect(cmd).toMatch(/(?:^|\/)tsx$/) // resolved tsx binary or bare 'tsx'
+    expect(args).toEqual(['/some/repo/bin/talosd.ts'])
+  })
+
   it('returns "started" when the spawner brings up a daemon', async () => {
     // We'll start the plane on a known port, then point autostart at it.
     // The spawner is a no-op; the plane is already-up but autostart's pre-check
