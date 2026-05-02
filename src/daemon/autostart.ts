@@ -66,14 +66,20 @@ export async function ensureDaemonRunning(opts: EnsureDaemonOpts): Promise<Ensur
   const stdoutLog = fs.openSync(paths.logPath, 'a')
   const stderrLog = fs.openSync(paths.logPath, 'a')
 
-  const child = spawner(binPath, [], {
+  // Dev-mode source paths (.ts) need a tsx wrapper. Production paths (.js,
+  // bin entrypoints) are spawned directly.
+  const isDevSource = binPath.endsWith('.ts')
+  const cmd = isDevSource ? resolveTsxBin(binPath) : binPath
+  const cmdArgs = isDevSource ? [binPath] : []
+
+  const child = spawner(cmd, cmdArgs, {
     detached: true,
     stdio: ['ignore', stdoutLog, stderrLog],
     env: process.env,
   })
   child.unref()
   const pid = child.pid ?? 0
-  log.info({ pid, binPath }, 'spawned talosd; waiting for WS to come up')
+  log.info({ pid, binPath, cmd }, 'spawned talosd; waiting for WS to come up')
 
   const ok = await pollUntilReady(opts.url, bootTimeoutMs, probeTimeoutMs)
   if (!ok) {
@@ -149,18 +155,35 @@ function isAlive(pid: number): boolean {
 
 function resolveTalosdBin(): string {
   // Resolve relative to the running script. After build the binaries end up
-  // at dist/bin/talos.js + dist/bin/talosd.js. In dev (tsx) we resolve via
-  // the bin dir of the current process.
+  // at dist/bin/talos.js + dist/bin/talosd.js. In dev (tsx) the source lives
+  // at bin/talosd.ts. The .ts case is handled in ensureDaemonRunning by
+  // spawning through tsx.
   const argv1 = process.argv[1] ?? ''
   const here = path.dirname(argv1)
   const candidates = [
     path.join(here, 'talosd.js'),
     path.join(here, 'talosd'),
+    path.join(here, 'talosd.ts'),
     path.resolve(here, '..', 'bin', 'talosd.js'),
+    path.resolve(here, '..', 'bin', 'talosd.ts'),
   ]
   for (const c of candidates) {
     if (fs.existsSync(c)) return c
   }
   // Last resort: assume on PATH.
   return 'talosd'
+}
+
+function resolveTsxBin(scriptPath: string): string {
+  // Walk up from the script looking for node_modules/.bin/tsx. Falls back
+  // to the bare `tsx` command if nothing turns up — caller will get ENOENT.
+  let dir = path.dirname(scriptPath)
+  for (let depth = 0; depth < 8; depth++) {
+    const candidate = path.join(dir, 'node_modules', '.bin', 'tsx')
+    if (fs.existsSync(candidate)) return candidate
+    const parent = path.dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return 'tsx'
 }
