@@ -190,6 +190,7 @@ export async function createKeeperHubClient(opts: KeeperHubClientOpts): Promise<
   }
 
   function asExecutionResult(raw: unknown): ExecutionResult {
+    log.info({ raw, rawType: typeof raw }, 'KeeperHub raw execution response (pre-parse)')
     if (typeof raw !== 'object' || raw === null) {
       return { executionId: '', status: 'pending', output: raw }
     }
