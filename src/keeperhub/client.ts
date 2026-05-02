@@ -46,8 +46,13 @@ export type ExecutionResult = {
   executionId: string
   status: WorkflowExecutionStatus
   txHash?: string
+  transactionLink?: string
   output?: unknown
   error?: string
+}
+
+const STATUS_SYNONYMS: Record<string, WorkflowExecutionStatus> = {
+  completed: 'success',
 }
 
 export interface KeeperHubClient {
@@ -130,7 +135,17 @@ export async function createKeeperHubClient(opts: KeeperHubClientOpts): Promise<
         headers: { Authorization: `Bearer ${token}` },
       } as unknown as MCPTransport,
       name: 'talos-keeperhub',
-      onUncaughtError: (err) => log.error({ err }, 'KeeperHub MCP uncaught error'),
+      onUncaughtError: (err) => {
+        // KH's MCP server rejects the SDK's optional GET-SSE inbound channel
+        // with 400 instead of the spec-conforming 405; downgrade since it's
+        // expected and harmless. All other transport errors still surface.
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('GET SSE failed: 400')) {
+          log.debug({ err }, 'KeeperHub MCP: optional inbound SSE not supported (expected)')
+          return
+        }
+        log.error({ err }, 'KeeperHub MCP uncaught error')
+      },
     })
     return mcp
   }
@@ -161,22 +176,34 @@ export async function createKeeperHubClient(opts: KeeperHubClientOpts): Promise<
           ? r.executionId
           : ''
     const statusRaw = (r.status ?? r.state) as string | undefined
+    const normalized = statusRaw ? (STATUS_SYNONYMS[statusRaw] ?? statusRaw) : ''
     const status = (
-      ['pending', 'running', 'success', 'failed', 'cancelled'].includes(statusRaw ?? '')
-        ? statusRaw
+      ['pending', 'running', 'success', 'failed', 'cancelled'].includes(normalized)
+        ? normalized
         : 'pending'
     ) as WorkflowExecutionStatus
     const txHash =
-      typeof r.tx_hash === 'string'
-        ? r.tx_hash
-        : typeof r.txHash === 'string'
-          ? r.txHash
+      typeof r.transactionHash === 'string'
+        ? r.transactionHash
+        : typeof r.transaction_hash === 'string'
+          ? r.transaction_hash
+          : typeof r.tx_hash === 'string'
+            ? r.tx_hash
+            : typeof r.txHash === 'string'
+              ? r.txHash
+              : undefined
+    const transactionLink =
+      typeof r.transactionLink === 'string'
+        ? r.transactionLink
+        : typeof r.transaction_link === 'string'
+          ? r.transaction_link
           : undefined
     const error = typeof r.error === 'string' ? r.error : undefined
     return {
       executionId,
       status,
       ...(txHash !== undefined ? { txHash } : {}),
+      ...(transactionLink !== undefined ? { transactionLink } : {}),
       ...(error !== undefined ? { error } : {}),
       output: r,
     }

@@ -868,6 +868,57 @@ describe('createKeeperHubClient', () => {
     await client.close()
   })
 
+  it('parses live KH direct-execution response (completed, transactionHash, transactionLink)', async () => {
+    const mockMcp = {
+      tools: vi.fn().mockResolvedValue({
+        get_direct_execution_status: {
+          description: 'status',
+          execute: vi.fn().mockResolvedValue({
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  executionId: 'spgrp6oi4d5ea2fdugdny',
+                  status: 'completed',
+                  type: 'transfer',
+                  transactionHash:
+                    '0xb6e8ad92f820436900a447dcb3490dfea65851de0c4f1276fc5d067e31ffcdd9',
+                  transactionLink:
+                    'https://sepolia.etherscan.io/tx/0xb6e8ad92f820436900a447dcb3490dfea65851de0c4f1276fc5d067e31ffcdd9',
+                  error: null,
+                  network: 'sepolia',
+                }),
+              },
+            ],
+          }),
+        },
+      }),
+      close: vi.fn().mockResolvedValue(undefined),
+    }
+    mockCreateMCPClient.mockResolvedValue(mockMcp)
+
+    await saveSession(tokenPath, {
+      client: { client_id: 'client-abc' },
+      accessToken: 'at-fresh',
+      refreshToken: 'rt-1',
+      expiresAt: Date.now() + 3_600_000,
+      tokenType: 'Bearer',
+    })
+    const client = await createKeeperHubClient({
+      tokenPath,
+      authServerMetadata: FAKE_META,
+    })
+    const out = await client.getExecutionStatus('spgrp6oi4d5ea2fdugdny')
+    expect(out.executionId).toBe('spgrp6oi4d5ea2fdugdny')
+    expect(out.status).toBe('success')
+    expect(out.txHash).toBe('0xb6e8ad92f820436900a447dcb3490dfea65851de0c4f1276fc5d067e31ffcdd9')
+    expect(out.transactionLink).toBe(
+      'https://sepolia.etherscan.io/tx/0xb6e8ad92f820436900a447dcb3490dfea65851de0c4f1276fc5d067e31ffcdd9',
+    )
+    expect(out.error).toBeUndefined()
+    await client.close()
+  })
+
   it('callTool throws when target tool is missing on the server', async () => {
     const mockMcp = {
       tools: vi.fn().mockResolvedValue({}),
