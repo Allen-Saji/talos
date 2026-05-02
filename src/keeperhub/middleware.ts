@@ -137,6 +137,17 @@ function wrapTool(name: string, original: Tool, deps: KeeperHubMiddlewareDeps): 
         if (route && khClient) {
           const callInput = await Promise.resolve(route(args))
           const exec = await khClient.executeContractCall(callInput)
+          log.info(
+            {
+              toolName: name,
+              executionId: exec.executionId,
+              status: exec.status,
+              txHash: exec.txHash,
+              transactionLink: exec.transactionLink,
+              error: exec.error,
+            },
+            'tool routed through keeperhub',
+          )
           executionId = exec.executionId
           if (exec.txHash) txHash = exec.txHash
           if (exec.status === 'failed' || exec.error) {

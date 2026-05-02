@@ -73,6 +73,13 @@ const EnvSchema = z.object({
   KNOWLEDGE_CRON_DISABLE: envBool(false),
   /** Run the knowledge cron once at boot — used by `talos init`'s sync first-fetch. */
   KNOWLEDGE_CRON_RUN_ON_BOOT: envBool(false),
+  /**
+   * Skip routing mutate tools through KeeperHub. When `true`, the audit
+   * middleware still records each call but the tool's original `execute`
+   * runs (direct viem TX from the burner wallet). Useful when the upstream
+   * KH service is degraded or for demos where deterministic latency matters.
+   */
+  KEEPERHUB_DISABLE_MUTATES: envBool(false),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 
