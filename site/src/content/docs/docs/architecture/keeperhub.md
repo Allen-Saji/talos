@@ -47,3 +47,24 @@ Read this table to reconstruct any agent run, audit it, replay it, or pull tx ha
 ## Bypass list
 
 The `KNOWN_READONLY` regex is in `src/keeperhub/middleware.ts`. Adding to it requires a code change — intentionally; it's a security boundary. To override per call, set `annotations.readonly: true` on the MCP tool itself.
+
+## Escape hatch: `KEEPERHUB_DISABLE_MUTATES`
+
+Set `KEEPERHUB_DISABLE_MUTATES=true` in `~/.config/talos/.env` (or your shell) to skip KH routing for mutates. When the flag is on:
+
+| What | Behaviour |
+|---|---|
+| Mutate tools | Execute directly via viem against the configured RPC |
+| Read-only tools | Unchanged — still bypass KH as usual |
+| Audit log | Still written to `tool_calls` (no `kh_workflow_id`, no `executionId`) |
+| Latency | ~5s per swap on Sepolia vs ~2 min KH polling timeout |
+
+When to use it:
+
+- KH origin is returning 5xx or opaque `failed` workflow results
+- You're recording a demo and need predictable confirmation latency
+- Debugging encoding issues — direct viem surfaces the raw revert reason
+
+The flag is parsed by `envBool()`, which accepts `true`/`1`/`yes`/`on` (and the matching false values). No other variant.
+
+Long-term, KH stays the default. The flag exists so KH-side problems never block the local agent.

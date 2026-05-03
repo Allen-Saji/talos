@@ -28,7 +28,7 @@ The wizard walks you through seven steps:
 | Flag | What it does |
 |---|---|
 | `--non-interactive` | Skip all prompts; fail if any required input is missing. For CI. |
-| `--skip-keeperhub` | Defer the KeeperHub OAuth handoff. Talos starts without audit; mutating tools 502 until you finish OAuth via `talos doctor --keeperhub`. |
+| `--skip-keeperhub` | Defer the KeeperHub OAuth handoff. Talos starts without KH; mutating tools fail until you either finish OAuth via `talos doctor --keeperhub` or set [`KEEPERHUB_DISABLE_MUTATES=true`](/docs/architecture/keeperhub#escape-hatch-keeperhub_disable_mutates) to route mutates directly through viem (audit log stays on). |
 | `--reset-keeperhub` | Forget existing KeeperHub credentials; re-run OAuth only. |
 | `--reset-wallet` | Generate a fresh burner. **Destructive** — your old burner address is forgotten. |
 
