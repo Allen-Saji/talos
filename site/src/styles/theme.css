@@ -392,6 +392,20 @@ table tr:last-child td { border-bottom: none; }
   color: var(--tlx-fg);
   overflow: hidden;
 }
+.tlx-term-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tlx-term-glyph {
+  flex: 0 0 auto;
+  min-width: 1.1em;
+  text-align: left;
+  white-space: nowrap;
+}
+.tlx-term-text { flex: 1 1 auto; min-width: 0; }
 .tlx-term-prompt { color: var(--tlx-bronze); }
 .tlx-term-out { color: var(--tlx-fg-muted); }
 .tlx-term-ok { color: var(--tlx-ok); }
