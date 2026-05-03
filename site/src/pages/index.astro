@@ -8,6 +8,9 @@ import LayerCake from '@/components/LayerCake.astro';
 import ToolGrid from '@/components/ToolGrid.astro';
 import ChannelsStrip from '@/components/ChannelsStrip.astro';
 import Footer from '@/components/Footer.astro';
+import Aurora from '@/components/react/Aurora.tsx';
+import SplitText from '@/components/react/SplitText.tsx';
+import DotGrid from '@/components/react/DotGrid.tsx';
 
 const title = 'Talos · A self-hosted Ethereum agent';
 const description = 'Daemon plus thin clients. Curated DeFi tools. Daily-fresh ecosystem knowledge. Bring your own keys. Your wallet never leaves your machine.';
@@ -77,7 +80,12 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
 
   <!-- HERO -->
   <section class="tlx-hero">
+    <div class="tlx-aurora-wrap" aria-hidden="true">
+      <Aurora client:visible colorStops={["#7a4f24", "#b87333", "#d4925a"]} amplitude={0.85} blend={0.55} speed={0.4} />
+    </div>
+    <div class="tlx-aurora-fallback" aria-hidden="true"></div>
     <div class="tlx-halo" aria-hidden="true"></div>
+    <div class="tlx-halo tlx-halo--blue" aria-hidden="true"></div>
     <div class="tlx-container tlx-hero-inner">
       <div class="tlx-hero-copy">
         <span class="tlx-eyebrow">A self-hosted Ethereum agent</span>
@@ -106,7 +114,7 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
   </section>
 
   <!-- 3-up tiles -->
-  <section class="tlx-section">
+  <section class="tlx-section tlx-section--reveal">
     <div class="tlx-container">
       <div class="tlx-grid tlx-grid--3">
         <article class="tlx-card">
@@ -135,20 +143,20 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
   </section>
 
   <!-- Quick MCP integration -->
-  <section class="tlx-section" id="embed">
+  <section class="tlx-section tlx-section--reveal" id="embed">
     <div class="tlx-container">
       <span class="tlx-eyebrow">Embed it</span>
-      <h2 class="tlx-section-title">Drop Talos into your assistant.</h2>
+      <SplitText client:visible text="Drop Talos into your assistant." className="tlx-section-title" tag="h2" />
       <p class="tlx-section-sub">Talos exposes itself as an MCP server. Paste this snippet into your host config — it's the same on every host.</p>
       <MCPHostTabs />
     </div>
   </section>
 
   <!-- Architecture -->
-  <section class="tlx-section" id="architecture">
+  <section class="tlx-section tlx-section--reveal tlx-section--weight" id="architecture">
     <div class="tlx-container">
       <span class="tlx-eyebrow">Architecture</span>
-      <h2 class="tlx-section-title">Daemon plus thin clients.</h2>
+      <SplitText client:visible text="Daemon plus thin clients." className="tlx-section-title" tag="h2" />
       <p class="tlx-section-sub">One process owns the database, the runtime, the MCP host, and the wallet. Everything else is a thin client over WebSocket.</p>
       <LayerCake />
       <p style="margin: 1.25rem 0 0; color: var(--tlx-fg-muted); font-size: 0.92rem;">
@@ -158,37 +166,42 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
   </section>
 
   <!-- Tool catalogue -->
-  <section class="tlx-section" id="tools">
+  <section class="tlx-section tlx-section--reveal" id="tools">
     <div class="tlx-container">
       <span class="tlx-eyebrow">Tool catalogue</span>
-      <h2 class="tlx-section-title">Six sources, one tool surface.</h2>
+      <SplitText client:visible text="Six sources, one tool surface." className="tlx-section-title" tag="h2" />
       <p class="tlx-section-sub">Each card is one source. Native means custom-built; MCP-as-source means a vendor MCP cherry-picked into Talos's namespace.</p>
       <ToolGrid />
     </div>
   </section>
 
   <!-- Channels strip -->
-  <section class="tlx-section" id="channels">
+  <section class="tlx-section tlx-section--reveal" id="channels">
     <div class="tlx-container">
       <span class="tlx-eyebrow">Channels</span>
-      <h2 class="tlx-section-title">One brain. Three faces.</h2>
+      <SplitText client:visible text="One brain. Three faces." className="tlx-section-title" tag="h2" />
       <p class="tlx-section-sub">CLI REPL for the terminal, Telegram for the phone, MCP server for any host. They share one wallet, one knowledge base, one memory store.</p>
       <ChannelsStrip />
     </div>
   </section>
 
   <!-- KH stripe -->
-  <section class="tlx-section" id="keeperhub">
+  <section class="tlx-section tlx-section--weight" id="keeperhub">
     <div class="tlx-container">
-      <div class="tlx-stripe">
-        <div class="tlx-stripe-text">
-          <span class="tlx-pill">KeeperHub</span>
-          <p style="margin: 0.7rem 0 0;"><strong>Audit-by-default execution.</strong></p>
-          <small>Every mutating tool call routes through a KeeperHub workflow. Receipts written to the local DB. Read-only calls bypass the hop. Talos is the reference "OpenClaw connector" for the KeeperHub track at ETHGlobal Open Agents.</small>
+      <div class="tlx-stripe tlx-stripe--dotgrid">
+        <div class="tlx-dotgrid-bg" aria-hidden="true">
+          <DotGrid client:visible dotSize={2} gap={28} baseColor="#25252f" activeColor="#b87333" proximity={120} shockRadius={180} shockStrength={4} returnDuration={1200} />
         </div>
-        <div style="display:flex; gap:0.6rem;">
-          <a class="tlx-btn" href="https://keeperhub.com">KeeperHub →</a>
-          <a class="tlx-btn tlx-btn--primary" href="/docs/architecture/keeperhub">How it works</a>
+        <div class="tlx-stripe-content">
+          <div class="tlx-stripe-text">
+            <span class="tlx-pill">KeeperHub</span>
+            <p style="margin: 0.7rem 0 0;"><strong>Audit-by-default execution.</strong></p>
+            <small>Every mutating tool call routes through a KeeperHub workflow. Receipts written to the local DB. Read-only calls bypass the hop. Talos is the reference "OpenClaw connector" for the KeeperHub track at ETHGlobal Open Agents.</small>
+          </div>
+          <div style="display:flex; gap:0.6rem;">
+            <a class="tlx-btn" href="https://keeperhub.com">KeeperHub →</a>
+            <a class="tlx-btn tlx-btn--primary" href="/docs/architecture/keeperhub">How it works</a>
+          </div>
         </div>
       </div>
     </div>
@@ -196,15 +209,72 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
 
   <Footer />
 
+  <script>
+    // Spotlight cursor on cards
+    function wireSpotlight() {
+      document.querySelectorAll<HTMLElement>('.tlx-card, .tlx-tool-card').forEach((card) => {
+        const onMove = (e: MouseEvent) => {
+          const r = card.getBoundingClientRect();
+          card.style.setProperty('--tlx-mx', `${e.clientX - r.left}px`);
+          card.style.setProperty('--tlx-my', `${e.clientY - r.top}px`);
+        };
+        card.addEventListener('mousemove', onMove, { passive: true });
+      });
+    }
+
+    // Sticky nav scroll-aware
+    function wireStickyNav() {
+      const nav = document.querySelector<HTMLElement>('.tlx-topnav');
+      const hero = document.querySelector<HTMLElement>('.tlx-hero');
+      if (!nav || !hero) return;
+      const obs = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            nav.classList.toggle('is-scrolled', !entry.isIntersecting);
+          }
+        },
+        { rootMargin: '-56px 0px 0px 0px', threshold: 0 },
+      );
+      obs.observe(hero);
+    }
+
+    // Section reveal: tightens eyebrow letter-spacing on enter
+    function wireSectionReveal() {
+      const sections = document.querySelectorAll<HTMLElement>('.tlx-section--reveal');
+      const obs = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+              obs.unobserve(entry.target);
+            }
+          }
+        },
+        { threshold: 0.2 },
+      );
+      sections.forEach((s) => obs.observe(s));
+    }
+
+    wireSpotlight();
+    wireStickyNav();
+    wireSectionReveal();
+  </script>
+
   <style>
     /* Top nav */
     .tlx-topnav {
       position: sticky;
       top: 0;
       z-index: 50;
+      background: transparent;
+      backdrop-filter: none;
+      border-bottom: 1px solid transparent;
+      transition: background 240ms ease, border-color 240ms ease, backdrop-filter 240ms ease;
+    }
+    .tlx-topnav.is-scrolled {
       background: rgba(10,10,12,0.78);
       backdrop-filter: blur(10px);
-      border-bottom: 1px solid var(--tlx-border);
+      border-bottom-color: var(--tlx-border);
     }
     .tlx-topnav-inner {
       display: flex;
@@ -239,6 +309,30 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
       overflow: hidden;
       padding: 4rem 0 5.5rem;
     }
+    .tlx-aurora-wrap {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.85;
+      mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.85) 35%, #000 60%, #000 100%);
+      -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.85) 35%, #000 60%, #000 100%);
+      pointer-events: none;
+    }
+    .tlx-aurora-fallback {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: linear-gradient(180deg, transparent 30%, rgba(184,115,51,0.10) 70%, rgba(212,146,90,0.18) 100%);
+      pointer-events: none;
+      display: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .tlx-aurora-wrap { display: none; }
+      .tlx-aurora-fallback { display: block; }
+    }
+    @media (max-width: 720px) {
+      .tlx-aurora-wrap { opacity: 0.6; }
+    }
     .tlx-hero-inner {
       display: grid;
       grid-template-columns: 1.15fr 0.85fr;
@@ -268,7 +362,18 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
     }
     .tlx-hero-meta span { display: inline-flex; align-items: center; gap: 0.5rem; }
     .tlx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tlx-fg-faint); display: inline-block; }
-    .tlx-dot--ok { background: var(--tlx-ok); box-shadow: 0 0 8px rgba(93,155,106,0.55); }
+    .tlx-dot--ok {
+      background: var(--tlx-ok);
+      box-shadow: 0 0 8px rgba(93,155,106,0.55);
+      animation: tlx-pulse 2.6s ease-in-out infinite;
+    }
+    @keyframes tlx-pulse {
+      0%, 100% { box-shadow: 0 0 8px rgba(93,155,106,0.55); }
+      50%      { box-shadow: 0 0 16px rgba(93,155,106,0.95), 0 0 4px rgba(93,155,106,1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .tlx-dot--ok { animation: none; }
+    }
 
     .tlx-hero-art {
       position: relative;
@@ -292,6 +397,43 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
       max-width: 480px;
       border-radius: 14px;
       box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px var(--tlx-border);
+    }
+
+    /* Stripe with DotGrid */
+    .tlx-stripe--dotgrid {
+      position: relative;
+      overflow: hidden;
+    }
+    .tlx-dotgrid-bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.9;
+      pointer-events: auto;
+      mask-image: radial-gradient(ellipse at center, #000 0%, #000 55%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, #000 55%, transparent 100%);
+    }
+    .tlx-stripe-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+    .tlx-stripe-content > * { pointer-events: auto; }
+
+    /* Section weight + reveal */
+    .tlx-section--weight { padding: 7rem 0; }
+    .tlx-section--reveal .tlx-eyebrow {
+      letter-spacing: 0.28em;
+      transition: letter-spacing 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .tlx-section--reveal.is-visible .tlx-eyebrow { letter-spacing: 0.18em; }
+    @media (prefers-reduced-motion: reduce) {
+      .tlx-section--reveal .tlx-eyebrow { letter-spacing: 0.18em; transition: none; }
     }
 
     /* Tile icon */

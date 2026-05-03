@@ -242,7 +242,7 @@ table tr:last-child td { border-bottom: none; }
 .tlx-btn--primary { background: var(--tlx-bronze); border-color: var(--tlx-bronze); color: #1a0e05; font-weight: 600; }
 .tlx-btn--primary:hover { background: var(--tlx-bronze-bright); border-color: var(--tlx-bronze-bright); color: #1a0e05; }
 
-/* Hero halo */
+/* Hero halo — two-tone: bronze top-right + ETH-blue bottom-left */
 .tlx-halo {
   position: absolute;
   inset: -10% -10% auto auto;
@@ -251,6 +251,12 @@ table tr:last-child td { border-bottom: none; }
   background: radial-gradient(closest-side, rgba(184, 115, 51, 0.22), transparent 70%);
   pointer-events: none;
   z-index: 0;
+}
+.tlx-halo--blue {
+  inset: auto auto -15% -15%;
+  width: 55%;
+  height: 55%;
+  background: radial-gradient(closest-side, rgba(98, 126, 234, 0.10), transparent 70%);
 }
 
 /* Section spacing */
@@ -273,8 +279,37 @@ table tr:last-child td { border-bottom: none; }
   border-radius: var(--tlx-radius-lg);
   padding: 1.25rem;
   transition: border-color 140ms ease, background 140ms ease;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 .tlx-card:hover { border-color: var(--tlx-border-bright); }
+
+/* Spotlight on cards — bronze radial follows the cursor */
+@media (prefers-reduced-motion: no-preference) {
+  .tlx-card::before,
+  .tlx-tool-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      520px circle at var(--tlx-mx, 50%) var(--tlx-my, 50%),
+      rgba(184, 115, 51, 0.14),
+      transparent 45%
+    );
+    opacity: 0;
+    transition: opacity 240ms ease;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .tlx-card:hover::before,
+  .tlx-tool-card:hover::before { opacity: 1; }
+  .tlx-card > *,
+  .tlx-tool-card > * { position: relative; z-index: 1; }
+}
+
+/* Tool cards need the same isolation */
+.tlx-tool-card { position: relative; overflow: hidden; isolation: isolate; }
 
 .tlx-card-title {
   font-size: 1rem;
@@ -372,6 +407,10 @@ table tr:last-child td { border-bottom: none; }
   justify-content: space-between;
   gap: 1.25rem;
   flex-wrap: wrap;
+}
+.tlx-stripe--dotgrid {
+  padding: 2.2rem 2rem;
+  display: block;
 }
 .tlx-stripe-text { color: var(--tlx-fg); }
 .tlx-stripe-text strong { color: var(--tlx-fg-strong); }
