@@ -123,10 +123,132 @@ header.header { border-bottom: 1px solid var(--tlx-border); background: rgba(10,
 
 /* Sidebar polish */
 .sidebar-content { padding-top: 1rem; }
-.sidebar-pane { border-right: 1px solid var(--tlx-border); }
+.sidebar-pane { border-right: 1px solid var(--tlx-border); background: var(--tlx-bg); }
 nav[aria-label="Main"] ul ul { border-left: 1px solid var(--tlx-border); margin-left: 0.5rem; padding-left: 0.5rem; }
 
-a.large, a.sidebar-link { transition: color 120ms ease, background 120ms ease; }
+a.large, a.sidebar-link {
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+  border-radius: 4px;
+}
+
+/* Sidebar category headers — bronze uppercase eyebrow style */
+.sidebar-content details > summary,
+.sidebar-content .group-label,
+.sidebar-content span.large {
+  font-family: var(--sl-font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tlx-bronze);
+  font-weight: 500;
+}
+.sidebar-content details > summary span,
+.sidebar-content .group-label span { font-weight: 500; }
+
+/* Sidebar active link — bronze accent + tinted background */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='true'] {
+  color: var(--tlx-fg-strong);
+  background: rgba(184, 115, 51, 0.10);
+  border-left: 2px solid var(--tlx-bronze);
+  padding-left: calc(0.5rem - 2px);
+}
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='true']:hover {
+  background: rgba(184, 115, 51, 0.16);
+}
+.sidebar-content a:not([aria-current]):hover {
+  color: var(--tlx-fg-strong);
+  background: var(--tlx-surface);
+}
+
+/* Right TOC ("On this page") */
+.right-sidebar h2,
+.right-sidebar starlight-toc h2 {
+  font-family: var(--sl-font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tlx-bronze);
+  font-weight: 500;
+}
+.right-sidebar a {
+  color: var(--tlx-fg-muted);
+  border-left: 1px solid transparent;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.right-sidebar a:hover { color: var(--tlx-fg); }
+.right-sidebar a[aria-current='true'],
+.right-sidebar a[aria-current='page'] {
+  color: var(--tlx-bronze-bright);
+  border-left-color: var(--tlx-bronze);
+}
+
+/* Page H1 — bronze hairline mark, matching landing wordmark */
+.sl-markdown-content > h1:first-child,
+main h1:not(.hero h1):first-of-type {
+  position: relative;
+  padding-left: 0.85rem;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.025em;
+}
+.sl-markdown-content > h1:first-child::before,
+main h1:not(.hero h1):first-of-type::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.18em;
+  bottom: 0.18em;
+  width: 3px;
+  background: linear-gradient(180deg, var(--tlx-bronze-bright), var(--tlx-bronze-deep));
+  border-radius: 2px;
+}
+
+/* Page H2 — bronze top hairline for section breaks */
+.sl-markdown-content > h2 {
+  margin-top: 2.6rem;
+  padding-top: 1.3rem;
+  border-top: 1px solid var(--tlx-border);
+  position: relative;
+}
+.sl-markdown-content > h2::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 32px;
+  height: 1px;
+  background: var(--tlx-bronze);
+}
+
+/* Header (top nav) — bronze hairline + soft halo */
+header.header {
+  border-bottom: 1px solid var(--tlx-border);
+  background: rgba(10, 10, 12, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+/* Pagination footer — bronze hover */
+.pagination-links a {
+  border: 1px solid var(--tlx-border);
+  border-radius: var(--tlx-radius);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.pagination-links a:hover {
+  border-color: var(--tlx-bronze);
+  background: var(--tlx-surface);
+}
+
+/* Search button styling */
+button[data-open-modal] {
+  border-color: var(--tlx-border) !important;
+  background: var(--tlx-surface) !important;
+  transition: border-color 140ms ease, background 140ms ease !important;
+}
+button[data-open-modal]:hover {
+  border-color: var(--tlx-bronze) !important;
+  background: var(--tlx-surface-rise) !important;
+}
 
 /* Starlight code block frame */
 .expressive-code { --ec-frm-edBg: var(--tlx-surface); --ec-frm-edActTabBg: var(--tlx-surface-rise); --ec-frm-edActTabIndBtmCol: var(--tlx-bronze); --ec-codeFontFml: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace; --ec-codeFontSize: 13.5px; }
@@ -242,7 +364,7 @@ table tr:last-child td { border-bottom: none; }
 .tlx-btn--primary { background: var(--tlx-bronze); border-color: var(--tlx-bronze); color: #1a0e05; font-weight: 600; }
 .tlx-btn--primary:hover { background: var(--tlx-bronze-bright); border-color: var(--tlx-bronze-bright); color: #1a0e05; }
 
-/* Hero halo */
+/* Hero halo — two-tone: bronze top-right + ETH-blue bottom-left */
 .tlx-halo {
   position: absolute;
   inset: -10% -10% auto auto;
@@ -251,6 +373,12 @@ table tr:last-child td { border-bottom: none; }
   background: radial-gradient(closest-side, rgba(184, 115, 51, 0.22), transparent 70%);
   pointer-events: none;
   z-index: 0;
+}
+.tlx-halo--blue {
+  inset: auto auto -15% -15%;
+  width: 55%;
+  height: 55%;
+  background: radial-gradient(closest-side, rgba(98, 126, 234, 0.10), transparent 70%);
 }
 
 /* Section spacing */
@@ -273,8 +401,37 @@ table tr:last-child td { border-bottom: none; }
   border-radius: var(--tlx-radius-lg);
   padding: 1.25rem;
   transition: border-color 140ms ease, background 140ms ease;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 .tlx-card:hover { border-color: var(--tlx-border-bright); }
+
+/* Spotlight on cards — bronze radial follows the cursor */
+@media (prefers-reduced-motion: no-preference) {
+  .tlx-card::before,
+  .tlx-tool-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      520px circle at var(--tlx-mx, 50%) var(--tlx-my, 50%),
+      rgba(184, 115, 51, 0.14),
+      transparent 45%
+    );
+    opacity: 0;
+    transition: opacity 240ms ease;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .tlx-card:hover::before,
+  .tlx-tool-card:hover::before { opacity: 1; }
+  .tlx-card > *,
+  .tlx-tool-card > * { position: relative; z-index: 1; }
+}
+
+/* Tool cards need the same isolation */
+.tlx-tool-card { position: relative; overflow: hidden; isolation: isolate; }
 
 .tlx-card-title {
   font-size: 1rem;
@@ -357,6 +514,20 @@ table tr:last-child td { border-bottom: none; }
   color: var(--tlx-fg);
   overflow: hidden;
 }
+.tlx-term-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tlx-term-glyph {
+  flex: 0 0 auto;
+  min-width: 1.1em;
+  text-align: left;
+  white-space: nowrap;
+}
+.tlx-term-text { flex: 1 1 auto; min-width: 0; }
 .tlx-term-prompt { color: var(--tlx-bronze); }
 .tlx-term-out { color: var(--tlx-fg-muted); }
 .tlx-term-ok { color: var(--tlx-ok); }
@@ -372,6 +543,10 @@ table tr:last-child td { border-bottom: none; }
   justify-content: space-between;
   gap: 1.25rem;
   flex-wrap: wrap;
+}
+.tlx-stripe--dotgrid {
+  padding: 2.2rem 2rem;
+  display: block;
 }
 .tlx-stripe-text { color: var(--tlx-fg); }
 .tlx-stripe-text strong { color: var(--tlx-fg-strong); }

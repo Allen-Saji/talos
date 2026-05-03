@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
 import mdx from '@astrojs/mdx';
+import react from '@astrojs/react';
 
 const SITE = 'https://talos.allensaji.dev';
 
@@ -9,6 +10,9 @@ export default defineConfig({
   site: SITE,
   trailingSlash: 'never',
   integrations: [
+    react({
+      include: ['**/components/react/**'],
+    }),
     starlight({
       title: 'Talos',
       description: 'A self-hosted, vertical Ethereum agent. Daemon plus thin clients. Curated DeFi tools. Daily-fresh ecosystem knowledge. BYOK.',

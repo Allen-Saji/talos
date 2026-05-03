@@ -44,14 +44,14 @@ const items = [
         <span class="tlx-mono" style="color:var(--tlx-fg-muted); font-size:0.78rem;">{c.sub}</span>
       </div>
       <p class="tlx-card-body" style="margin-bottom:0.85rem;"><span class="tlx-mono" style="color:var(--tlx-bronze-bright)">{c.title}</span></p>
-      <pre class="tlx-term">
+      <div class="tlx-term">
         {c.snippet.map((s) => (
-          <div>
-            <span class={s.ok ? 'tlx-term-ok' : s.m ? 'tlx-term-out' : 'tlx-term-prompt'}>{s.p}</span>
-            <span style="margin-left:0.5em;">{s.t}</span>
+          <div class="tlx-term-line">
+            <span class={`tlx-term-glyph ${s.ok ? 'tlx-term-ok' : s.m ? 'tlx-term-out' : 'tlx-term-prompt'}`}>{s.p}</span>
+            <span class="tlx-term-text">{s.t}</span>
           </div>
         ))}
-      </pre>
+      </div>
     </article>
   ))}
 </div>
