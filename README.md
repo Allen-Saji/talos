@@ -81,39 +81,7 @@ Every chain-mutating call is routed through [KeeperHub](https://keeperhub.com) f
 
 ## Architecture
 
-```
-                     ┌──────────────────────────────────────────────┐
-                     │  Thin clients                                │
-                     │   talos repl  │  Telegram  │  MCP hosts     │
-                     └─────┬─────────────┬─────────────┬────────────┘
-                           │ WS:7711     │ in-process  │ stdio + WS
-                           ▼             ▼             ▼
-        ┌────────────────────────────────────────────────────────┐
-        │  talosd  (always-running daemon, launchd/systemd)      │
-        │                                                        │
-        │  ┌─ Channel adapters ────────────────────────────────┐ │
-        │  │  cli-ws    │   telegram   │   mcp-server         │ │
-        │  └───────────────────────────────────────────────────┘ │
-        │                                                        │
-        │  ┌─ Runtime (Vercel AI SDK v6) ─────────────────────┐ │
-        │  │  Provider router  │  Agent registry              │ │
-        │  │  Memory manager   │  Prompt builder              │ │
-        │  │  Agent loop (streamText) + middleware            │ │
-        │  └───────────────────────────────────────────────────┘ │
-        │                                                        │
-        │  ┌─ KeeperHub middleware ───────────────────────────┐ │
-        │  │  Annotation-driven routing │ audit-by-default    │ │
-        │  └───────────────────────────────────────────────────┘ │
-        ├────────────────────────────────────────────────────────┤
-        │  PGLite + Drizzle  (knowledge + conversations)         │
-        ├────────────────────────────────────────────────────────┤
-        │  Wallet (viem) + nightly knowledge cron                │
-        ├────────────────────────────────────────────────────────┤
-        │  Hot MCP tool servers                                  │
-        │   AgentKit  │  Blockscout  │  EVM  │  Li.Fi           │
-        │   Aave (native)  │  Uniswap V3 (native)               │
-        └────────────────────────────────────────────────────────┘
-```
+![Talos layer cake — thin clients, talosd (channel adapters / runtime / KeeperHub middleware), PGLite + Drizzle, wallet + knowledge cron, hot MCP tool servers](assets/talos-arch.png)
 
 See [`docs/architecture.md`](docs/architecture.md) for the full design — schemas, event taxonomy, retrieval strategy, daemon lifecycle, and the audit-by-default contract.
 
