@@ -49,6 +49,12 @@ Talos reads its `.env` from the install directory and merges with the user shell
 | `TALOS_DB_PATH` | PGLite directory override (default `~/.config/talos/db`) |
 | `TALOS_LOG_LEVEL` | pino level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` |
 
+## KeeperHub
+
+| Var | Purpose |
+|---|---|
+| `KEEPERHUB_DISABLE_MUTATES` | When `true`, mutate tools skip KH routing and execute directly via viem. Audit logging to `tool_calls` stays on. Use during KH outages or to cut latency for demos. Accepts `true`/`1`/`yes`/`on` (and false equivalents). |
+
 ## Locations
 
 | File | Mode |
