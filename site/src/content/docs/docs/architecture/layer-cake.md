@@ -3,7 +3,7 @@ title: Layer cake
 description: How talosd, the runtime, persistence, the wallet, and the hot MCP host fit together.
 ---
 
-![Talos layer cake — thin clients, talosd (channel adapters / runtime / KeeperHub middleware), PGLite + Drizzle, wallet + knowledge cron, hot MCP tool servers](/talos-arch.png)
+![Talos layer cake — thin clients, talosd (channel adapters / runtime), PGLite + Drizzle, wallet + knowledge cron, hot MCP tool servers](/talos-arch.png)
 
 ## Locked decisions
 
@@ -17,6 +17,6 @@ description: How talosd, the runtime, persistence, the wallet, and the hot MCP h
 | 6 | Cross-thread recall | Adaptive: cosine ≥ 0.78, top-3, always-search |
 | 7 | Summarization trigger | Turn count: every 20 runs |
 | 8 | LLM call style | `streamText` everywhere |
-| 9 | KeeperHub default | **Audit-by-default** — undeclared tools routed |
+| 9 | Tx execution | Sign locally via viem; no third-party signer in the path |
 
-For the full design — schemas, event taxonomy, retrieval strategy, daemon lifecycle, audit-by-default contract — see [`docs/architecture.md`](https://github.com/Allen-Saji/talos/blob/main/docs/architecture.md) in the repo.
+For the full design — schemas, event taxonomy, retrieval strategy, daemon lifecycle — see [`docs/architecture.md`](https://github.com/Allen-Saji/talos/blob/main/docs/architecture.md) in the repo.

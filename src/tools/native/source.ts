@@ -1,5 +1,4 @@
 import type { Tool } from 'ai'
-import type { MutateRoute } from '@/keeperhub'
 import type { ToolAnnotations } from '@/mcp-host'
 import type { ToolSource } from '@/runtime/types'
 
@@ -8,24 +7,13 @@ import type { ToolSource } from '@/runtime/types'
  * wrappers, custom Aave/Uniswap tools). Sits alongside `McpToolSource` in the
  * runtime's tool sources list.
  *
- * Unlike third-party MCP servers, native tools declare their annotations
- * directly — no parsing, no overrides. Callers expose `annotations(name)` so
- * the KeeperHub middleware can consult both this source and the MCP host
- * when deciding audit routing.
- *
  * Tool names are pre-namespaced by the source itself (e.g. `lifi_get_quote`)
  * so callers don't need a separate prefix configuration. Keep names matching
  * `[a-zA-Z0-9_]{1,64}` per the host convention.
- *
- * Mutate tools may register a `MutateRoute` so the KeeperHub middleware can
- * route their execution through `executeContractCall` instead of the original
- * `execute`. Routes are optional — sources without them keep the audit-only
- * fallback.
  */
 export class NativeToolSource implements ToolSource {
   private readonly tools: Record<string, Tool>
   private readonly annotationsByName: Record<string, ToolAnnotations>
-  private readonly routesByName: Record<string, MutateRoute>
   readonly name: string
 
   constructor(opts: {
@@ -35,13 +23,10 @@ export class NativeToolSource implements ToolSource {
     tools: Record<string, Tool>
     /** Per-tool annotations, keyed by namespaced name. */
     annotations: Record<string, ToolAnnotations>
-    /** Optional KeeperHub mutate routes, keyed by namespaced tool name. */
-    routes?: Record<string, MutateRoute>
   }) {
     this.name = opts.name
     this.tools = opts.tools
     this.annotationsByName = opts.annotations
-    this.routesByName = opts.routes ?? {}
   }
 
   async getTools(): Promise<Record<string, Tool>> {
@@ -56,10 +41,5 @@ export class NativeToolSource implements ToolSource {
   /** All namespaced names this source contributes. */
   toolNames(): string[] {
     return Object.keys(this.tools)
-  }
-
-  /** Returns the registered KeeperHub routes (empty when none configured). */
-  routes(): Record<string, MutateRoute> {
-    return { ...this.routesByName }
   }
 }

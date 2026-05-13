@@ -10,12 +10,10 @@ import {
   type NewStep,
   type NewThread,
   type NewThreadSummary,
-  type NewToolCall,
   runs,
   steps,
   threadSummaries,
   threads,
-  toolCalls,
 } from './schema'
 
 const EMBEDDING_DIMS = 1536
@@ -63,83 +61,6 @@ export async function appendStep(db: Db, input: NewStep) {
   const [row] = await db.insert(steps).values(input).returning()
   if (!row) throw new TalosDbError('appendStep returned no row', 'DB_NO_ROW')
   return row
-}
-
-export async function recordToolCall(db: Db, input: NewToolCall) {
-  const [row] = await db.insert(toolCalls).values(input).returning()
-  if (!row) throw new TalosDbError('recordToolCall returned no row', 'DB_NO_ROW')
-  return row
-}
-
-/**
- * Backfill `step_id` on audit rows already inserted by the KeeperHub
- * middleware. The middleware fires at tool execute time — before the step row
- * exists — so it writes `step_id = null` and the runtime UPDATEs after
- * `appendStep` returns. Scoped by `run_id + tool_call_id` so concurrent runs
- * never cross-contaminate.
- */
-export async function updateToolCallStepIds(
-  db: Db,
-  runId: string,
-  toolCallIds: readonly string[],
-  stepId: string,
-): Promise<void> {
-  if (toolCallIds.length === 0) return
-  await db
-    .update(toolCalls)
-    .set({ stepId })
-    .where(
-      sql`${toolCalls.runId} = ${runId} AND ${toolCalls.toolCallId} IN (${sql.join(
-        toolCallIds.map((id) => sql`${id}`),
-        sql`, `,
-      )})`,
-    )
-}
-
-export type ToolAuditMeta = {
-  /** True if KeeperHub middleware would route this through workflow audit. */
-  shouldAudit: boolean
-  /** Why the decision was made (e.g. KNOWN_READONLY, annotation_readOnly, audit_default). */
-  reason: string
-  /** KeeperHub workflow / execution / tx wiring (populated by #10's protocol-tool routing). */
-  workflowId?: string
-  executionId?: string
-  txHash?: string
-  /** Free-form details passed by the middleware (e.g. timing, route taken). */
-  details?: Record<string, unknown>
-}
-
-export type ToolCallAuditInput = {
-  runId: string
-  stepId?: string | null
-  toolCallId: string
-  toolName: string
-  args?: unknown
-  result?: unknown
-  error?: string | null
-  audit: ToolAuditMeta
-  startedAt?: Date
-  finishedAt?: Date
-}
-
-/**
- * Append a tool-call row with structured audit metadata. Used by the
- * KeeperHub middleware on every tool invocation; never throws on
- * malformed audit metadata — failures are surfaced to the caller.
- */
-export async function appendToolCallAudit(db: Db, input: ToolCallAuditInput) {
-  return recordToolCall(db, {
-    runId: input.runId,
-    stepId: input.stepId ?? null,
-    toolCallId: input.toolCallId,
-    toolName: input.toolName,
-    args: input.args ?? null,
-    result: input.result ?? null,
-    error: input.error ?? null,
-    audit: input.audit,
-    ...(input.startedAt ? { startedAt: input.startedAt } : {}),
-    ...(input.finishedAt ? { finishedAt: input.finishedAt } : {}),
-  })
 }
 
 export async function insertMessageEmbedding(

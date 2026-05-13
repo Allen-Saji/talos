@@ -2,7 +2,6 @@ import fs from 'node:fs'
 import { WebSocket } from 'ws'
 import { paths } from '@/config/paths'
 import { ensureToken } from '@/config/token'
-import { isExpired, loadSession } from '@/keeperhub/token'
 import { createDb, runMigrations } from '@/persistence'
 import {
   type ClientFrame,
@@ -35,7 +34,6 @@ export async function runDiagnostics(opts: RunDiagnosticsOpts = {}): Promise<Dia
   const results: DiagnosticResult[] = []
   results.push(await checkDb())
   results.push(await checkDaemon(daemonUrl, daemonTimeoutMs))
-  results.push(await checkKeeperHub())
   return results
 }
 
@@ -127,45 +125,6 @@ async function checkDaemon(url: string, timeoutMs: number): Promise<DiagnosticRe
       }
     })
   })
-}
-
-async function checkKeeperHub(): Promise<DiagnosticResult> {
-  const tokenPath = paths.keeperhubTokenPath
-  if (!fs.existsSync(tokenPath)) {
-    return {
-      name: 'keeperhub',
-      pass: false,
-      detail: `no session at ${tokenPath}; run \`talos init\` to authorize`,
-    }
-  }
-  try {
-    const session = await loadSession(tokenPath)
-    if (!session) {
-      return {
-        name: 'keeperhub',
-        pass: false,
-        detail: 'session file present but empty',
-      }
-    }
-    if (isExpired(session) && !session.refreshToken) {
-      return {
-        name: 'keeperhub',
-        pass: false,
-        detail: 'access token expired and no refresh_token — re-run `talos init`',
-      }
-    }
-    return {
-      name: 'keeperhub',
-      pass: true,
-      detail: `session for client ${session.client.client_id} (expires ${new Date(session.expiresAt).toISOString()})`,
-    }
-  } catch (err) {
-    return {
-      name: 'keeperhub',
-      pass: false,
-      detail: err instanceof Error ? err.message : String(err),
-    }
-  }
 }
 
 /** Pretty-print diagnostic results as a fixed-width table for console output. */

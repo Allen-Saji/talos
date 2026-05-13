@@ -7,7 +7,6 @@ export type ExistingState = {
   envFile: boolean
   envHasOpenAiKey: boolean
   burnerWallet: boolean
-  keeperhubToken: boolean
   daemonToken: boolean
   channelsConfig: boolean
   /** True when none of the above exist (a true fresh install). */
@@ -23,17 +22,15 @@ export function detectExisting(p: typeof paths = paths): ExistingState {
   const envFile = fs.existsSync(envPath)
   const envHasOpenAiKey = envFile && readEnvHasKey(envPath, 'OPENAI_API_KEY')
   const burnerWallet = fs.existsSync(p.burnerWalletPath)
-  const keeperhubToken = fs.existsSync(p.keeperhubTokenPath)
   const daemonToken = fs.existsSync(p.tokenPath)
   const channelsConfig = fs.existsSync(p.channelsConfigPath)
 
-  const empty = !envFile && !burnerWallet && !keeperhubToken && !daemonToken && !channelsConfig
+  const empty = !envFile && !burnerWallet && !daemonToken && !channelsConfig
 
   return {
     envFile,
     envHasOpenAiKey,
     burnerWallet,
-    keeperhubToken,
     daemonToken,
     channelsConfig,
     empty,

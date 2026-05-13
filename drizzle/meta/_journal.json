@@ -29,6 +29,13 @@
       "when": 1777556419835,
       "tag": "0003_typical_senator_kelly",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778693766391,
+      "tag": "0004_drop_tool_calls",
+      "breakpoints": true
     }
   ]
 }

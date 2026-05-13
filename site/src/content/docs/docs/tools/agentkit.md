@@ -36,7 +36,7 @@ If `EVM_PRIVATE_KEY` is set, that's the signer. Otherwise Talos generates a burn
 
 ## Routing
 
-AgentKit tools are passed through with their original MCP annotations. Pyth `fetch_*` actions are read-only and bypass KeeperHub. Compound `supply`/`borrow` are mutates and route through it.
+AgentKit tools are passed through with their original MCP annotations. Pyth `fetch_*` actions are read-only. Compound `supply`/`borrow` mutate state and sign locally via viem from the Talos burner wallet.
 
 ## Gotchas (cherry-pick patches)
 

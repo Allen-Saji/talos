@@ -25,18 +25,14 @@ program
   .command('init')
   .description('Bootstrap a new Talos installation')
   .option('--non-interactive', 'read all values from env, skip prompts (for CI)')
-  .option('--skip-keeperhub', 'skip the KeeperHub OAuth step (rerun later)')
   .option('--skip-service', 'skip the service-install prompt')
-  .action(
-    async (opts: { nonInteractive?: boolean; skipKeeperhub?: boolean; skipService?: boolean }) => {
-      const result = await runWizard({
-        mode: opts.nonInteractive ? 'non-interactive' : 'interactive',
-        skipKeeperhub: opts.skipKeeperhub ?? false,
-        skipService: opts.skipService ?? opts.nonInteractive ?? false,
-      })
-      process.exit(result.succeeded ? 0 : 1)
-    },
-  )
+  .action(async (opts: { nonInteractive?: boolean; skipService?: boolean }) => {
+    const result = await runWizard({
+      mode: opts.nonInteractive ? 'non-interactive' : 'interactive',
+      skipService: opts.skipService ?? opts.nonInteractive ?? false,
+    })
+    process.exit(result.succeeded ? 0 : 1)
+  })
 
 program
   .command('install-service')

@@ -11,8 +11,6 @@ const sdkMocks = vi.hoisted(() => ({
 
 vi.mock('@lifi/sdk', () => sdkMocks)
 
-import { shouldAudit } from '@/keeperhub/middleware'
-import { namespaceToolName } from '@/mcp-host'
 import { resetLifiSdkForTests } from '@/tools/lifi/client'
 import { lifiReadTools } from '@/tools/lifi/tools'
 
@@ -36,16 +34,6 @@ describe('lifiReadTools — registration shape', () => {
     ])
     for (const name of names) {
       expect(annotations[name]).toEqual({ mutates: false, readOnly: true, destructive: false })
-    }
-  })
-
-  it('every tool routes to bypass via shouldAudit', () => {
-    const { tools, annotations } = lifiReadTools()
-    for (const name of Object.keys(tools)) {
-      const namespaced = namespaceToolName('runtime', name).replace('runtime_', '')
-      // Native tools are pre-namespaced; just pass the name as-is.
-      const decision = shouldAudit(name, annotations[name])
-      expect(decision.shouldAudit, `${namespaced} should bypass audit`).toBe(false)
     }
   })
 })

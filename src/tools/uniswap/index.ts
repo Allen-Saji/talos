@@ -1,4 +1,4 @@
-export { buildApproveRoute, buildApproveTool } from './approve'
+export { buildApproveTool } from './approve'
 export {
   DEFAULT_FEE_TIER,
   DEFAULT_SLIPPAGE_BPS,
@@ -11,5 +11,5 @@ export {
 } from './contracts'
 export { buildQuoteTool, type QuoteResult } from './quote'
 export { createUniswapToolSource } from './source'
-export { buildSwapRoute, buildSwapTool, type SwapResult } from './swap'
+export { buildSwapTool, type SwapResult } from './swap'
 export { resolveToken, SEPOLIA_TOKENS, type SepoliaToken } from './tokens'

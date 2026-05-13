@@ -18,9 +18,9 @@ export type WalletDeps = {
  * `paths.burnerWalletPath` (0600), and display the mnemonic + address ONCE
  * so the user can write it down. Confirms before continuing.
  *
- * Idempotency: if a burner already exists and the user chose `keep` or
- * `partial-oauth-only`, preserve the existing privateKey. In interactive
- * mode we still display the address and offer to regenerate.
+ * Idempotency: if a burner already exists and the user chose `keep`, preserve
+ * the existing privateKey. In interactive mode we still display the address
+ * and offer to regenerate.
  *
  * Storage shape (`burner.json`):
  *   { privateKey: '0x...', mnemonic?: '...' (only when generated this run) }
@@ -28,15 +28,6 @@ export type WalletDeps = {
 export async function runWalletStep(ctx: WizardContext, deps: WalletDeps): Promise<StepResult> {
   const log = deps.log ?? ((l: string) => process.stdout.write(`${l}\n`))
   const burnerPath = ctx.paths.burnerWalletPath
-
-  if (ctx.idempotency === 'partial-oauth-only' && ctx.existing.burnerWallet) {
-    const addr = readBurnerAddress(burnerPath)
-    return {
-      status: 'kept',
-      summary: `Wallet kept (${addr})`,
-      data: { address: addr, regenerated: false },
-    }
-  }
 
   if (ctx.idempotency === 'keep' && ctx.existing.burnerWallet) {
     const addr = readBurnerAddress(burnerPath)

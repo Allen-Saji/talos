@@ -1,7 +1,6 @@
 import { tool } from 'ai'
 import { type Address, type Hex, type PublicClient, parseUnits, type WalletClient } from 'viem'
 import { z } from 'zod'
-import type { MutateRoute } from '@/keeperhub'
 import { ERC20_ABI, INTEREST_RATE_MODE_VARIABLE, POOL_ABI, SEPOLIA_AAVE } from './contracts'
 import { resolveAaveToken } from './tokens'
 
@@ -50,7 +49,7 @@ export function buildRepayTool(opts: {
 }) {
   return tool({
     description:
-      'Repay a variable-rate debt position on Aave V3 (Sepolia). Pool must be pre-approved (call aave_approve_pool first). Pass amount="max" to repay the entire outstanding debt at execution time. Mutates state; routed through KeeperHub when configured.',
+      'Repay a variable-rate debt position on Aave V3 (Sepolia). Pool must be pre-approved (call aave_approve_pool first). Pass amount="max" to repay the entire outstanding debt at execution time.',
     inputSchema: RepaySchema,
     execute: async (args): Promise<RepayResult> => {
       const token = resolveAaveToken(args.token)
@@ -99,26 +98,3 @@ export function buildRepayTool(opts: {
     },
   })
 }
-
-/** KeeperHub mutate route for `aave_repay` — `Pool.repay(...)`. */
-export const buildRepayRoute =
-  (opts: { walletAddress: Address }): MutateRoute =>
-  (args) => {
-    const parsed = RepaySchema.parse(args)
-    const token = resolveAaveToken(parsed.token)
-    const isMax = parsed.amount.toLowerCase() === 'max'
-    const amountRaw = isMax ? MAX_UINT256 : parseUnits(parsed.amount, token.decimals)
-    const onBehalfOf = (parsed.onBehalfOf ?? opts.walletAddress) as Address
-    return {
-      network: 'sepolia',
-      contract_address: SEPOLIA_AAVE.pool,
-      function_name: 'repay',
-      function_args: [
-        token.address,
-        amountRaw.toString(),
-        INTEREST_RATE_MODE_VARIABLE.toString(),
-        onBehalfOf,
-      ],
-      abi: POOL_ABI,
-    }
-  }

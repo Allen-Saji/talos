@@ -11,10 +11,6 @@ Vertical ETH agent for ETHGlobal Open Agents (Apr 24 – May 6 2026). Self-hoste
 
 Runtime design (frameworks, schemas, flows): see [[architecture]].
 
-## Sponsor tracks
-
-- **F0.1** P0 KeeperHub ($5k primary) — prize page names "OpenClaw" connector explicitly
-
 ## 1. Wallet Layer
 
 - **F1.1** P0 BYOK private key via viem, local storage at `~/.config/talos/` with 0600 perms
@@ -26,15 +22,10 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 - **F1.7** P1 Per-chain balance display in init summary and `status` command
 - **F1.8** P2 Hardware wallet path (Ledger via viem)
 
-## 2. Execution Layer (KeeperHub)
+## 2. Execution Layer
 
-- **F2.1** P0 KeeperHub MCP wired in via `https://app.keeperhub.com/mcp`
-- **F2.2** P0 Every agent tx routed through `create_workflow` + `execute_workflow` for audit trail
-- **F2.3** P0 `@keeperhub/wallet` x402 hook installed for outbound paid API calls (Base)
-- **F2.4** P0 Audit log surface: `get_direct_execution_status` exposed via CLI for direct executions (the path the audit middleware uses; arg `execution_id`, snake_case). `get_execution_logs` is workflow-only and uses `executionId` (camelCase).
-- **F2.5** P1 Daily knowledge cron uses KeeperHub Schedule trigger instead of local cron
-- **F2.6** P1 Spending guardrails: per-day cap, per-tx cap, configurable
-- **F2.7** P2 Submit feedback bounty entry ($500 builder feedback prize)
+- **F2.1** P0 Mutating tools execute directly via viem from the local burner wallet — no third-party signer in the path
+- **F2.2** P1 Spending guardrails: per-day cap, per-tx cap, configurable
 
 ## 3. MCP Tool Layer
 
@@ -73,7 +64,6 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 - **F5.8** P2 Voice interface via dTelecom provider (x402 micropayments)
 - **F5.9** P0 First-class `Agent` type + AgentRegistry (multi-agent ready, single agent v1)
 - **F5.10** P0 Vercel AI SDK (`ai` package) as agent loop substrate
-- **F5.11** P0 Audit-by-default KeeperHub middleware: undeclared tools route through workflows; regex `KNOWN_READONLY` allowlist bypasses known read-only patterns
 
 ## 6. Onboarding (the wedge)
 
@@ -81,12 +71,11 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 - **F6.2** P0 Interactive prompts: model + key, wallet (generate or import), default chain
 - **F6.3** P0 Auto-runs first knowledge cron synchronously
 - **F6.4** P0 Time-to-first-usable-agent under 60 seconds
-- **F6.5** P0 Clear printout: agent's address, chains, MCPs enabled, KeeperHub status, last-sync timestamp
-- **F6.6** P1 KeeperHub OAuth handoff during init (browser flow)
+- **F6.5** P0 Clear printout: agent's address, chains, MCPs enabled, last-sync timestamp
 - **F6.7** P1 ZeroDev project ID auto-prompt with link to free tier signup
 - **F6.8** P1 `talos status` command shows current capabilities, last cron run, balances
 - **F6.9** P1 `talos doctor` command diagnoses misconfigs
-- **F6.10** P0 `init` is idempotent: detects existing config, prompts keep / reset / partial-reset (re-do OAuth only)
+- **F6.10** P0 `init` is idempotent: detects existing config, prompts keep / reset
 
 ## 7. Distribution
 
@@ -101,15 +90,13 @@ Runtime design (frameworks, schemas, flows): see [[architecture]].
 - **F8.1** P0 Recorded video: install + 3 scripted interactions in under 3 minutes
 - **F8.2** P0 Live demo URL or downloadable binary judges can run
 - **F8.3** P0 Architecture diagram (BBG-style via diagram-kit)
-- **F8.4** P0 Submission writeup for KeeperHub track
-
 ## 9. Embeddability (Talos-as-MCP)
 
 (Implemented as the `mcp-server` channel adapter under Section 11.)
 
 - **F9.1** P0 `talos serve --mcp` proxies host stdio MCP ↔ daemon WS (auto-starts daemon)
 - **F9.2** P0 Tool: `query_eth_knowledge` — hits local PGLite vector DB, returns top-N chunks + cited sources
-- **F9.3** P0 Tool: `eth_action` — runs full agent loop, returns KeeperHub workflow URL + tx hash
+- **F9.3** P0 Tool: `eth_action` — runs full agent loop, returns tx hash(es)
 - **F9.4** P0 Tool: `eth_status` — wallet, chains, last-sync, enabled MCPs
 - **F9.5** P0 Tool: `talos_new_thread` — resets the host's session thread
 - **F9.6** P0 One thread per host session (continuity across `eth_action` calls)
@@ -124,7 +111,7 @@ Detail in [[architecture]] §Persistence + §Memory.
 
 - **F10.1** P0 PGLite single-store at `~/.config/talos/talos.db` (knowledge + conversations); daemon owns at runtime, one-shot commands open directly only when daemon is stopped
 - **F10.2** P0 Drizzle ORM with auto-generated SQL migrations
-- **F10.3** P0 Schema: `threads`, `runs`, `steps`, `tool_calls`, `message_embeddings`, `knowledge_chunks`
+- **F10.3** P0 Schema: `threads`, `runs`, `steps`, `message_embeddings`, `knowledge_chunks`
 - **F10.4** P0 Hybrid retrieval: pgvector HNSW (semantic) + tsvector GIN (keyword)
 - **F10.5** P0 Three-tier memory: hot (last 20 runs), warm (thread summary), cold (cross-thread recall)
 - **F10.6** P0 Adaptive cross-thread recall: cosine ≥ 0.78, top-3, always-search threshold-gated
@@ -167,9 +154,6 @@ Stack: Vitest + PGLite-in-memory + seeded LLM eval. Demo-flow eval is the regres
 ### P0 — required for v1
 
 - **F12.1** P0 Provider router resolves model id → SDK adapter (unit)
-- **F12.2** P0 KeeperHub middleware: `mutates: true` → routes through workflow (unit)
-- **F12.3** P0 KeeperHub middleware: undeclared annotation → defaults to mutating (unit)
-- **F12.4** P0 KeeperHub middleware: name matches `KNOWN_READONLY` allowlist → bypasses (unit)
 - **F12.5** P0 Tool-result flattening: single text → string (unit)
 - **F12.6** P0 Tool-result flattening: text-with-JSON → parsed object (unit)
 - **F12.7** P0 Cross-thread recall: cosine ≥ 0.78 threshold gate enforces (unit)
@@ -180,7 +164,7 @@ Stack: Vitest + PGLite-in-memory + seeded LLM eval. Demo-flow eval is the regres
 - **F12.12** P0 WS auth: valid token → connect + can run (integration)
 - **F12.13** P0 Run abort: AbortController cancels `streamText`, persists `runs.error: 'aborted'` (integration)
 - **F12.14** P0 Telegram whitelist: non-allowed user silently dropped (unit)
-- **F12.15** P0 `init` idempotency: re-running with existing config prompts keep/reset/partial (unit)
+- **F12.15** P0 `init` idempotency: re-running with existing config prompts keep/reset (unit)
 - **F12.16** P0 **CRITICAL** Demo-flow eval: "supply 100 USDC to Aave on arbitrum" hits expected MCP sequence on locked seed (eval)
 
 ### P1 — required for v1.1
@@ -191,11 +175,10 @@ Stack: Vitest + PGLite-in-memory + seeded LLM eval. Demo-flow eval is the regres
 - **F12.20** P1 MCP-server proxy: stdio in → WS out → events back, end-to-end (integration)
 - **F12.21** P1 Telegram edit-in-place: rate-limit throttle (~1.1s) holds (integration)
 - **F12.22** P1 Knowledge cron: one source 503, others succeed, partial state surfaced (integration)
-- **F12.23** P1 OAuth flow end-to-end against mocked KeeperHub (integration)
 
 ## Counts
 
-130 features. P0 = 87. P1 = 33. P2 = 10.
+Feature counts above reflect the post-KeeperHub-removal surface (2026-05-13).
 
 ## Open questions (deferred)
 

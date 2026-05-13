@@ -36,7 +36,6 @@ vi.mock('@/config/paths', async () => {
       pidPath: path.join(tmp, 'config', 'daemon.pid'),
       channelsConfigPath: path.join(tmp, 'config', 'channels.yaml'),
       logPath: path.join(tmp, 'data', 'talos.log'),
-      keeperhubTokenPath: path.join(tmp, 'config', 'keeperhub.token'),
       burnerWalletPath: path.join(tmp, 'config', 'burner.json'),
     },
   }

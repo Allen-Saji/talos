@@ -42,7 +42,7 @@ Slash commands are handled client-side (no daemon roundtrip):
 
 ## Aborting
 
-`^C` sends an `abort_run` frame — the daemon cancels the in-flight run and returns. In-flight tool calls already submitted to KeeperHub keep their workflow IDs; you can resume by re-issuing the request.
+`^C` sends an `abort_run` frame — the daemon cancels the in-flight run and returns. In-flight tool calls already broadcast on-chain remain confirmed; re-issuing the request reads the receipt.
 
 ## Thread keying
 

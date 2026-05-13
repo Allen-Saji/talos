@@ -9,7 +9,6 @@ const BANNER = [
   '  This wizard will set up:',
   '    - OpenAI API key',
   '    - Wallet (fresh burner with mnemonic)',
-  '    - KeeperHub OAuth session',
   '    - Channels (CLI / Telegram / MCP-server)',
   '    - Daemon token + database',
   '    - Optional: launchd / systemd service install',

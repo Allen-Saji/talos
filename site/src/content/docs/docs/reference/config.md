@@ -34,19 +34,6 @@ talos_dt_5f8c9...
 
 Regenerate with `talos init --reset-token` (forces all open thin clients to reconnect).
 
-## `keeperhub.json`
-
-KeeperHub OAuth credentials. Mode `0600`. Don't edit by hand — use `talos init --reset-keeperhub` to refresh.
-
-```json
-{
-  "client_id": "kh_dcr_...",
-  "refresh_token": "kh_rt_...",
-  "scope": "workflow:read workflow:write",
-  "issued_at": "2026-04-29T10:30:00Z"
-}
-```
-
 ## `burner.json`
 
 Burner wallet (only if `EVM_PRIVATE_KEY` is unset). Mode `0600`.

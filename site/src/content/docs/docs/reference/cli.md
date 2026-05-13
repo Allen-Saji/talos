@@ -10,7 +10,7 @@ The `talos` binary has subcommands. The `talosd` binary is the daemon — no sub
 Interactive bootstrap wizard. See [`talos init` walkthrough](/docs/get-started/init).
 
 ```bash
-talos init [--non-interactive] [--skip-keeperhub] [--reset-keeperhub] [--reset-wallet]
+talos init [--non-interactive] [--skip-service]
 ```
 
 ## `talos repl`
@@ -38,13 +38,12 @@ This is what hosts spawn as a child process.
 Print diagnostics. Run when something feels off — missing config, broken auth, stale data.
 
 ```bash
-talos doctor [--keeperhub] [--db] [--knowledge]
+talos doctor [--db] [--knowledge]
 ```
 
 | Flag | Subcheck |
 |---|---|
-| (none) | All checks: env, files, daemon socket, KH OAuth, DB integrity, last cron run |
-| `--keeperhub` | OAuth token validity, refresh round-trip |
+| (none) | All checks: env, files, daemon socket, DB integrity, last cron run |
 | `--db` | PGLite migrations applied, integrity check |
 | `--knowledge` | Last cron timestamp + retrieval smoke query |
 

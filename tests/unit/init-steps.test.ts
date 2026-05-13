@@ -26,7 +26,6 @@ function pathsFor(configDir: string): typeof Paths {
     pidPath: path.join(configDir, 'daemon.pid'),
     channelsConfigPath: path.join(configDir, 'channels.yaml'),
     logPath: path.join(configDir, 'talos.log'),
-    keeperhubTokenPath: path.join(configDir, 'keeperhub.token'),
     burnerWalletPath: path.join(configDir, 'burner.json'),
   } as const
 }
@@ -36,7 +35,6 @@ function emptyExisting(): ExistingState {
     envFile: false,
     envHasOpenAiKey: false,
     burnerWallet: false,
-    keeperhubToken: false,
     daemonToken: false,
     channelsConfig: false,
     empty: true,
@@ -46,7 +44,6 @@ function emptyExisting(): ExistingState {
 function makeCtx(overrides: Partial<WizardContext> & { paths: typeof Paths }): WizardContext {
   return {
     mode: 'interactive',
-    skipKeeperhub: false,
     skipService: false,
     existing: emptyExisting(),
     idempotency: 'reset',
@@ -196,25 +193,6 @@ describe('runWalletStep', () => {
     expect(stored.privateKey).toMatch(/^0x[0-9a-f]{64}$/)
     expect(stored.mnemonic).toMatch(/^(\w+ ){11}\w+$/)
     expect(lines.some((l) => l.includes('Mnemonic:'))).toBe(true)
-  })
-
-  it('preserves existing wallet under partial-oauth-only', async () => {
-    const paths = pathsFor(dir)
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(
-      paths.burnerWalletPath,
-      JSON.stringify({
-        privateKey: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
-      }),
-    )
-    const ctx = makeCtx({
-      paths,
-      idempotency: 'partial-oauth-only',
-      existing: { ...emptyExisting(), burnerWallet: true, empty: false },
-    })
-    const result = await runWalletStep(ctx, { prompter: makePrompter() })
-    expect(result.status).toBe('kept')
-    expect(result.data?.regenerated).toBe(false)
   })
 
   it('asks before regenerating an existing wallet in interactive mode', async () => {

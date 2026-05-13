@@ -5,7 +5,6 @@ import { detectExisting, type ExistingState } from './detect'
 import { interactivePrompter, noPrompter, type Prompter } from './prompt'
 import { runChannelsStep } from './steps/channels'
 import { runDaemonTokenStep } from './steps/daemon-token'
-import { runKeeperhubOauthStep } from './steps/keeperhub-oauth'
 import { runMigrationsStep } from './steps/migrations'
 import { runOpenAiKeyStep } from './steps/openai-key'
 import { runServiceStep } from './steps/service'
@@ -17,8 +16,6 @@ const log = logger.child({ module: 'init' })
 
 export type WizardOpts = {
   mode?: WizardMode
-  /** Skip the KeeperHub OAuth step entirely (e.g. KH not provisioned yet). */
-  skipKeeperhub?: boolean
   /** Skip the service-install step (auto-true in non-interactive). */
   skipService?: boolean
   /** Override paths (tests). */
@@ -60,7 +57,6 @@ export async function runWizard(opts: WizardOpts = {}): Promise<WizardResult> {
   const ctx: WizardContext = {
     mode,
     paths,
-    skipKeeperhub: opts.skipKeeperhub ?? false,
     skipService: opts.skipService ?? mode === 'non-interactive',
     existing,
     idempotency,
@@ -71,7 +67,6 @@ export async function runWizard(opts: WizardOpts = {}): Promise<WizardResult> {
     runWelcomeStep(ctx, { log: print })
     await runStep(ctx, 'openai-key', () => runOpenAiKeyStep(ctx, { prompter }))
     await runStep(ctx, 'wallet', () => runWalletStep(ctx, { prompter, log: print }))
-    await runStep(ctx, 'keeperhub-oauth', () => runKeeperhubOauthStep(ctx, { prompter, print }))
     await runStep(ctx, 'channels', () => runChannelsStep(ctx, { prompter }))
     await runStep(ctx, 'daemon-token', () => runDaemonTokenStep(ctx))
     await runStep(ctx, 'migrations', () => runMigrationsStep(ctx))
@@ -128,12 +123,7 @@ async function chooseIdempotency(opts: {
       {
         name: 'reset',
         value: 'reset',
-        description: 'overwrite everything (loses keys, mnemonic, KH session)',
-      },
-      {
-        name: 'partial-oauth-only',
-        value: 'partial-oauth-only',
-        description: 'preserve everything except KeeperHub session (re-do OAuth)',
+        description: 'overwrite everything (loses keys, mnemonic)',
       },
     ],
     default: 'keep',
@@ -144,7 +134,6 @@ function describeExisting(s: ExistingState): string[] {
   const out: string[] = []
   if (s.envFile) out.push(`.env (${s.envHasOpenAiKey ? 'has' : 'no'} OPENAI_API_KEY)`)
   if (s.burnerWallet) out.push('burner.json (wallet)')
-  if (s.keeperhubToken) out.push('keeperhub.token (OAuth session)')
   if (s.daemonToken) out.push('daemon.token')
   if (s.channelsConfig) out.push('channels.yaml')
   return out

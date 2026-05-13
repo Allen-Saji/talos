@@ -54,7 +54,7 @@ If you want continuity across host launches, call `talos_new_thread` and pass `t
 {"method":"notifications/progress","params":{"progress":1,"total":8,"message":"calling uniswap_get_quote"}}
 {"method":"notifications/progress","params":{"progress":2,"total":8,"message":"quote: ~2.59 USDC"}}
 {"method":"notifications/progress","params":{"progress":3,"total":8,"message":"calling uniswap_swap_exact_in"}}
-{"method":"notifications/progress","params":{"progress":4,"total":8,"message":"keeperhub: workflow wf_8a3c..."}}
+{"method":"notifications/progress","params":{"progress":4,"total":8,"message":"signing tx with viem"}}
 {"method":"notifications/progress","params":{"progress":5,"total":8,"message":"tx 0x17643319... submitted"}}
 {"method":"notifications/progress","params":{"progress":6,"total":8,"message":"tx confirmed in block 5612343"}}
 ```

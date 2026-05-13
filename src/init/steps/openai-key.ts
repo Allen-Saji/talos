@@ -14,8 +14,7 @@ export type OpenAiKeyDeps = {
  * persist it to `paths.configDir/.env` (mode 0600).
  *
  * Idempotency: when the env file already has a non-empty `OPENAI_API_KEY=...`
- * line and the user chose `keep`, this step is a no-op. In `partial-oauth-only`
- * mode we always preserve. Otherwise we prompt.
+ * line and the user chose `keep`, this step is a no-op. Otherwise we prompt.
  */
 export async function runOpenAiKeyStep(
   ctx: WizardContext,
@@ -23,10 +22,7 @@ export async function runOpenAiKeyStep(
 ): Promise<StepResult> {
   const envPath = path.join(ctx.paths.configDir, '.env')
 
-  if (
-    ctx.idempotency === 'partial-oauth-only' ||
-    (ctx.idempotency === 'keep' && ctx.existing.envHasOpenAiKey)
-  ) {
+  if (ctx.idempotency === 'keep' && ctx.existing.envHasOpenAiKey) {
     return { status: 'kept', summary: `OpenAI key kept (${envPath})` }
   }
 

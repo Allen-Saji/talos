@@ -124,7 +124,7 @@ const lifi_get_status = tool({
 
 /**
  * Annotations for every tool above. Pure reads — no chain mutation,
- * no off-chain trust impact. Routed to bypass KeeperHub workflow audit.
+ * no off-chain trust impact.
  */
 const READ_ONLY: ToolAnnotations = {
   mutates: false,

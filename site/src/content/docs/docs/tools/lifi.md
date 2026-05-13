@@ -23,7 +23,7 @@ You: bridge 5 USDC from Sepolia to Base Sepolia
 ↳ calling lifi_get_quote { fromChain: 11155111, toChain: 84532, fromToken: "USDC", toToken: "USDC", fromAmount: "5000000" }
   ✓ via Across, ETA 90s, fee 0.04 USDC
 ↳ calling lifi_execute_quote
-  ↳ keeperhub: workflow wf_c19a... → tx 0x3b22... → submitted
+  ✓ tx 0x3b22... → submitted
 ↳ calling lifi_get_status { txHash: "0x3b22..." }
   ✓ DONE — destination tx 0x9aff... on Base Sepolia
 ```

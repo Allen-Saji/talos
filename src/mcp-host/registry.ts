@@ -1,8 +1,9 @@
 import type { Tool } from 'ai'
 
 /**
- * Tool annotations as surfaced by MCP servers.
- * Used by KeeperHub middleware (#8) to decide audit routing.
+ * Tool annotations as surfaced by MCP servers. Informational metadata —
+ * native tools may inspect these, but the runtime call path does not gate
+ * on them.
  */
 export type ToolAnnotations = {
   mutates?: boolean

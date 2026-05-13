@@ -24,10 +24,10 @@ The protocol is JSON over WebSocket. Frame types are validated with Zod schemas 
 |---|---|
 | `startup` | Open PGLite, run pending migrations, register MCP sources, bind WS |
 | `ready` | Accept channel connections; nightly cron registers |
-| `request` | Per-run thread keying, retrieval, agent loop, middleware, response stream |
+| `request` | Per-run thread keying, retrieval, agent loop, response stream |
 | `shutdown` | Drain in-flight runs (with timeout), close PGLite, flush logs |
 
-Crash recovery: PGLite is durable on every commit, so a hard kill is recoverable. In-flight runs at the LLM are aborted; tool calls already submitted to KeeperHub keep their workflow ID — re-running the run picks up the receipt.
+Crash recovery: PGLite is durable on every commit, so a hard kill is recoverable. In-flight runs at the LLM are aborted; tool calls already broadcast to chain remain confirmed on the next run — re-running the request reads the receipt.
 
 ## Service install
 

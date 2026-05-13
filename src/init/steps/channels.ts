@@ -16,9 +16,9 @@ type ChannelKey = 'cli' | 'telegram' | 'mcp_server'
  * Pick which channels to enable and (for telegram) collect a bot token.
  * Writes `paths.channelsConfigPath` (YAML).
  *
- * Idempotency: in `keep` or `partial-oauth-only` and a config exists, no-op.
- * Non-interactive defaults to CLI + MCP-server enabled, Telegram off unless
- * `TELEGRAM_BOT_TOKEN` is set in env.
+ * Idempotency: in `keep` and a config exists, no-op. Non-interactive defaults
+ * to CLI + MCP-server enabled, Telegram off unless `TELEGRAM_BOT_TOKEN` is set
+ * in env.
  */
 export async function runChannelsStep(
   ctx: WizardContext,
@@ -27,10 +27,7 @@ export async function runChannelsStep(
   const channelsPath = ctx.paths.channelsConfigPath
   const readEnv = deps.readEnv ?? ((k: string) => process.env[k])
 
-  if (
-    (ctx.idempotency === 'keep' || ctx.idempotency === 'partial-oauth-only') &&
-    ctx.existing.channelsConfig
-  ) {
+  if (ctx.idempotency === 'keep' && ctx.existing.channelsConfig) {
     return { status: 'kept', summary: `channels.yaml kept (${channelsPath})` }
   }
 
