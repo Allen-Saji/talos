@@ -24,7 +24,7 @@ gh pr create
 
 ```
 feat(runtime): add provider router
-fix(keeperhub): respect KNOWN_READONLY allowlist
+fix(persistence): backfill tsvector index on existing rows
 chore: bump @ai-sdk/openai
 docs(architecture): clarify thread keying
 ```
@@ -51,7 +51,7 @@ To re-install hooks after a fresh clone: `pnpm install` (the `prepare` script wi
 
 ## Lanes
 
-- **Lane A** (Allen): runtime, persistence, KeeperHub middleware, daemon control plane.
+- **Lane A** (Allen): runtime, persistence, daemon control plane.
 - **Lane B** (Amal): MCP host, tool wiring, knowledge cron.
 - **Joint**: init wizard, channels impl, demo recording.
 

@@ -41,7 +41,6 @@ function envBool(def: boolean): z.ZodType<boolean> {
 const EnvSchema = z.object({
   OPENAI_API_KEY: optionalNonEmpty,
   OPENAI_BASE_URL: optionalUrl,
-  KEEPERHUB_URL: optionalUrl,
   TELEGRAM_BOT_TOKEN: optionalNonEmpty,
   TALOS_DAEMON_PORT: z.coerce.number().int().min(1).max(65535).default(7711),
   TALOS_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -73,13 +72,6 @@ const EnvSchema = z.object({
   KNOWLEDGE_CRON_DISABLE: envBool(false),
   /** Run the knowledge cron once at boot — used by `talos init`'s sync first-fetch. */
   KNOWLEDGE_CRON_RUN_ON_BOOT: envBool(false),
-  /**
-   * Skip routing mutate tools through KeeperHub. When `true`, the audit
-   * middleware still records each call but the tool's original `execute`
-   * runs (direct viem TX from the burner wallet). Useful when the upstream
-   * KH service is degraded or for demos where deterministic latency matters.
-   */
-  KEEPERHUB_DISABLE_MUTATES: envBool(false),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 

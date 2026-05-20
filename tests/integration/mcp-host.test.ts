@@ -175,7 +175,6 @@ vi.mock('@ai-sdk/mcp', () => ({
   createMCPClient: mockCreateMCPClient,
 }))
 
-// Mock env to avoid KEEPERHUB_URL empty-string validation failure
 vi.mock('@/config/env', () => ({
   loadEnv: () => ({
     OPENAI_API_KEY: 'test-key',

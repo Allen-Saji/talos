@@ -42,11 +42,11 @@ You: swap 0.001 ETH for USDC on uniswap, then supply 2 USDC to aave
 ↳ calling uniswap_get_quote { tokenIn: "ETH", tokenOut: "USDC", amountIn: "0.001" }
    ✓ ~2.59 USDC at 0.3% fee
 ↳ calling uniswap_swap_exact_in { ... }
-   ↳ keeperhub: workflow wf_8a3c... → tx 0x17643319... → confirmed
+   ✓ tx 0x17643319... → confirmed
 ↳ calling aave_approve_pool { token: "USDC", amount: "2" }
-   ↳ keeperhub: workflow wf_5d2e... → tx 0x4b9a... → confirmed
+   ✓ tx 0x4b9a... → confirmed
 ↳ calling aave_supply { token: "USDC", amount: "2" }
-   ↳ keeperhub: workflow wf_b71f... → tx 0x9c2d... → confirmed
+   ✓ tx 0x9c2d... → confirmed
 
 Done. Swapped 0.001 ETH for 2.59 USDC and supplied 2 USDC to Aave.
 You now have an aUSDC position earning variable yield.

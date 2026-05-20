@@ -37,8 +37,7 @@ export type AccountDataResult = {
 /**
  * Build the `aave_get_user_account_data` tool. Calls Pool.getUserAccountData
  * and returns the six aggregate numbers Aave maintains per account, formatted
- * to human-readable units alongside the raw bigints. Read-only; the leading
- * `_get_` opts out of KeeperHub audit via the KNOWN_READONLY regex.
+ * to human-readable units alongside the raw bigints. Read-only.
  *
  * `healthFactor == 2^256 - 1` means the user has no open borrow positions —
  * Aave returns the max uint as a sentinel. We surface it as `"infinity"` for

@@ -53,7 +53,6 @@ export default defineConfig({
             { label: 'Layer cake', slug: 'docs/architecture/layer-cake' },
             { label: 'Daemon + thin clients', slug: 'docs/architecture/daemon' },
             { label: 'Three-tier memory', slug: 'docs/architecture/memory' },
-            { label: 'KeeperHub middleware', slug: 'docs/architecture/keeperhub' },
           ],
         },
         {

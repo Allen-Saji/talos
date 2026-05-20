@@ -30,4 +30,4 @@ Blockscout's hosted MCP at `https://mcp.blockscout.com` speaks **Streamable HTTP
 
 ## Routing
 
-All Blockscout tools are annotated `readonly: true`, so they bypass [KeeperHub](/docs/architecture/keeperhub).
+All Blockscout tools are annotated `readOnly: true` — pure read-path indexer queries.

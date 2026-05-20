@@ -1,7 +1,6 @@
 import { tool } from 'ai'
 import { type Address, type Hex, type PublicClient, parseUnits, type WalletClient } from 'viem'
 import { z } from 'zod'
-import type { MutateRoute } from '@/keeperhub'
 import {
   DEFAULT_FEE_TIER,
   DEFAULT_SLIPPAGE_BPS,
@@ -39,12 +38,9 @@ export type SwapResult = {
 
 /**
  * Build the `uniswap_swap_exact_in` tool. Calls SwapRouter02.exactInputSingle
- * after computing `amountOutMinimum` from a fresh QuoterV2 call.
- *
- * In KeeperHub-routed mode this tool's execute is replaced by the route below;
- * the wallet must have already called `uniswap_approve_router`. The direct
- * execute path also assumes allowance is in place — it fails loudly when the
- * router has no approval, mirroring the routed contract.
+ * after computing `amountOutMinimum` from a fresh QuoterV2 call. Fails loud
+ * when the router has no approval — caller must run `uniswap_approve_router`
+ * first.
  */
 export function buildSwapTool(opts: {
   walletClient: WalletClient
@@ -113,36 +109,6 @@ export function buildSwapTool(opts: {
     },
   })
 }
-
-/**
- * KeeperHub mutate route for `uniswap_swap_exact_in`. Async so it can re-run
- * the QuoterV2 call at route-build time — fresh quote → fresh
- * `amountOutMinimum` → KH workflow gets the same slippage protection the
- * direct path enforces.
- */
-export const buildSwapRoute =
-  (opts: { walletAddress: Address; publicClient: PublicClient }): MutateRoute =>
-  async (args) => {
-    const parsed = SwapSchema.parse(args)
-    const prep = await prepareSwap(parsed, opts.publicClient)
-    return {
-      network: 'sepolia',
-      contract_address: SEPOLIA_UNISWAP.swapRouter02,
-      function_name: 'exactInputSingle',
-      function_args: [
-        {
-          tokenIn: prep.tokenIn.address,
-          tokenOut: prep.tokenOut.address,
-          fee: prep.fee,
-          recipient: opts.walletAddress,
-          amountIn: prep.amountInRaw.toString(),
-          amountOutMinimum: prep.amountOutMinRaw.toString(),
-          sqrtPriceLimitX96: '0',
-        },
-      ],
-      abi: SWAP_ROUTER_ABI,
-    }
-  }
 
 async function prepareSwap(
   args: SwapInput,

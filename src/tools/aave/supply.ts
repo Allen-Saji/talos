@@ -1,7 +1,6 @@
 import { tool } from 'ai'
 import { type Address, type Hex, type PublicClient, parseUnits, type WalletClient } from 'viem'
 import { z } from 'zod'
-import type { MutateRoute } from '@/keeperhub'
 import { ERC20_ABI, POOL_ABI, REFERRAL_CODE, SEPOLIA_AAVE } from './contracts'
 import { resolveAaveToken } from './tokens'
 
@@ -37,7 +36,7 @@ export function buildSupplyTool(opts: {
 }) {
   return tool({
     description:
-      'Supply (deposit) an ERC-20 token to Aave V3 (Sepolia) and mint aTokens. Pool must be pre-approved (call aave_approve_pool first). Mutates state; routed through KeeperHub when configured. Native ETH is not supported here — use WETH.',
+      'Supply (deposit) an ERC-20 token to Aave V3 (Sepolia) and mint aTokens. Pool must be pre-approved (call aave_approve_pool first). Native ETH is not supported here — use WETH.',
     inputSchema: SupplySchema,
     execute: async (args): Promise<SupplyResult> => {
       const token = resolveAaveToken(args.token)
@@ -77,20 +76,3 @@ export function buildSupplyTool(opts: {
     },
   })
 }
-
-/** KeeperHub mutate route for `aave_supply` — `Pool.supply(...)`. */
-export const buildSupplyRoute =
-  (opts: { walletAddress: Address }): MutateRoute =>
-  (args) => {
-    const parsed = SupplySchema.parse(args)
-    const token = resolveAaveToken(parsed.token)
-    const amountRaw = parseUnits(parsed.amount, token.decimals)
-    const onBehalfOf = (parsed.onBehalfOf ?? opts.walletAddress) as Address
-    return {
-      network: 'sepolia',
-      contract_address: SEPOLIA_AAVE.pool,
-      function_name: 'supply',
-      function_args: [token.address, amountRaw.toString(), onBehalfOf, REFERRAL_CODE],
-      abi: POOL_ABI,
-    }
-  }

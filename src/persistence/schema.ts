@@ -76,26 +76,6 @@ export const steps = pgTable(
   (t) => [index('steps_run_idx').on(t.runId)],
 )
 
-export const toolCalls = pgTable(
-  'tool_calls',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    runId: uuid('run_id')
-      .notNull()
-      .references(() => runs.id, { onDelete: 'cascade' }),
-    stepId: uuid('step_id').references(() => steps.id, { onDelete: 'cascade' }),
-    toolCallId: text('tool_call_id').notNull(),
-    toolName: text('tool_name').notNull(),
-    args: jsonb('args'),
-    result: jsonb('result'),
-    error: text('error'),
-    audit: jsonb('audit'),
-    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
-    finishedAt: timestamp('finished_at', { withTimezone: true }),
-  },
-  (t) => [index('tool_calls_run_idx').on(t.runId), index('tool_calls_name_idx').on(t.toolName)],
-)
-
 export const messageEmbeddings = pgTable(
   'message_embeddings',
   {
@@ -211,8 +191,6 @@ export type Run = typeof runs.$inferSelect
 export type NewRun = typeof runs.$inferInsert
 export type Step = typeof steps.$inferSelect
 export type NewStep = typeof steps.$inferInsert
-export type ToolCall = typeof toolCalls.$inferSelect
-export type NewToolCall = typeof toolCalls.$inferInsert
 export type MessageEmbedding = typeof messageEmbeddings.$inferSelect
 export type NewMessageEmbedding = typeof messageEmbeddings.$inferInsert
 export type KnowledgeChunk = typeof knowledgeChunks.$inferSelect

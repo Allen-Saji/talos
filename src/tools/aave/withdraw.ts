@@ -1,7 +1,6 @@
 import { tool } from 'ai'
 import { type Address, type Hex, type PublicClient, parseUnits, type WalletClient } from 'viem'
 import { z } from 'zod'
-import type { MutateRoute } from '@/keeperhub'
 import { POOL_ABI, SEPOLIA_AAVE } from './contracts'
 import { resolveAaveToken } from './tokens'
 
@@ -47,7 +46,7 @@ export function buildWithdrawTool(opts: {
 }) {
   return tool({
     description:
-      'Withdraw supplied tokens from Aave V3 (Sepolia) by redeeming aTokens. No approval required (the user owns the aTokens). Pass amount="max" to redeem the full aToken balance. Mutates state; routed through KeeperHub when configured.',
+      'Withdraw supplied tokens from Aave V3 (Sepolia) by redeeming aTokens. No approval required (the user owns the aTokens). Pass amount="max" to redeem the full aToken balance.',
     inputSchema: WithdrawSchema,
     execute: async (args): Promise<WithdrawResult> => {
       const token = resolveAaveToken(args.token)
@@ -75,21 +74,3 @@ export function buildWithdrawTool(opts: {
     },
   })
 }
-
-/** KeeperHub mutate route for `aave_withdraw` — `Pool.withdraw(...)`. */
-export const buildWithdrawRoute =
-  (opts: { walletAddress: Address }): MutateRoute =>
-  (args) => {
-    const parsed = WithdrawSchema.parse(args)
-    const token = resolveAaveToken(parsed.token)
-    const isMax = parsed.amount.toLowerCase() === 'max'
-    const amountRaw = isMax ? MAX_UINT256 : parseUnits(parsed.amount, token.decimals)
-    const to = (parsed.to ?? opts.walletAddress) as Address
-    return {
-      network: 'sepolia',
-      contract_address: SEPOLIA_AAVE.pool,
-      function_name: 'withdraw',
-      function_args: [token.address, amountRaw.toString(), to],
-      abi: POOL_ABI,
-    }
-  }

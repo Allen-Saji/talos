@@ -78,11 +78,9 @@ These are the candidates I evaluated against the bronze/dark dev-tool brief. Eac
 
 ---
 
-### 2. DotGrid — section atmosphere (KeeperHub stripe + behind 3-up tiles)
+### 2. DotGrid — section atmosphere (behind 3-up tiles)
 
-**Where it goes:** As an absolute-positioned background inside two specific sections:
-- The KeeperHub sponsor stripe (`#keeperhub`) — replaces the flat surface with subtle moving texture during scroll-into-view
-- Optionally behind the 3-up tile section (the one with "Vertical, not general", etc.) — gentle dotted backdrop with mouse-near-dot reaction
+**Where it goes:** As an absolute-positioned background behind the 3-up tile section (the one with "Vertical, not general", etc.) — gentle dotted backdrop with mouse-near-dot reaction.
 
 **Integration strategy:** React island (`client:visible`). DotGrid is canvas 2D + GSAP — no WebGL, but it's still a 200+ line component with InertiaPlugin physics that doesn't port cleanly to vanilla. React island is the right choice. GSAP InertiaPlugin is **not free** (requires Club GreenSock Premium) — verify before installing or fall back to dropping the inertia and using vanilla `requestAnimationFrame`. **Open question for Allen** flagged below.
 
@@ -104,7 +102,7 @@ These are the candidates I evaluated against the bronze/dark dev-tool brief. Eac
 **File changes:**
 - `package.json`: add `gsap` (and `@gsap/inertia` if licensed; otherwise patch component to remove)
 - New: `src/components/react/DotGrid.tsx` — vendored, Tailwind classes replaced with inline styles
-- `src/pages/index.astro`: drop a `<DotGrid client:visible />` inside the KeeperHub stripe wrapper
+- `src/pages/index.astro`: drop a `<DotGrid client:visible />` inside the 3-up tile section wrapper
 
 **Expected visual outcome:** A grid of nearly-invisible bronze-dark dots (gap 28 px). Cursor proximity lights nearby dots up to bright bronze with a subtle ripple. Click sends a soft shockwave outward. Reads as "engineering grid paper" — dignified, on-brand, rewards interaction without demanding it.
 
@@ -233,7 +231,7 @@ New: at scroll-top, nav has zero background and zero border (lets the hero breat
 ### 7. Section rhythm tightening
 
 Current: `padding: 5rem 0` between sections, plus a `border-top` hairline. Reads slightly forum-thread on long scroll.
-New: alternate between rest sections (5 rem) and "weight" sections (7 rem above architecture, KeeperHub stripe). Promote the architecture section's `LayerCake` and the KeeperHub stripe with extra breathing room. Drop the `border-top` between sections that share a backdrop (DotGrid'd ones), keep it between unstyled ones.
+New: alternate between rest sections (5 rem) and "weight" sections (7 rem above architecture). Promote the architecture section's `LayerCake` with extra breathing room. Drop the `border-top` between sections that share a backdrop (DotGrid'd ones), keep it between unstyled ones.
 
 **Implementation:** add `.tlx-section--weight { padding: 7rem 0; }` and `.tlx-section--seamless + .tlx-section--seamless { border-top: none; }`. Apply selectively in `index.astro`.
 
@@ -278,7 +276,7 @@ These are off-limits during implementation. If a future change benefits any of t
 
 1. Add `@astrojs/react` integration + verify hello-world React island works in the existing build pipeline. **Must not break Starlight docs pages** — verify `/docs/get-started/overview` still renders.
 2. Vendor SplitText + SpotlightCard (the smaller two), wire them up. These are reversible if anything goes sideways.
-3. Vendor DotGrid (KeeperHub stripe first, then evaluate behind 3-up tiles). Decide on GSAP InertiaPlugin licensing — see open question below.
+3. Vendor DotGrid (behind 3-up tiles). Decide on GSAP InertiaPlugin licensing — see open question below.
 4. Vendor Aurora last (highest perf cost). Verify mobile gating and reduced-motion fallback work before merging.
 5. Add the 5 non-reactbits polish items in any order.
 6. Walkthrough at all four breakpoints (375 / 768 / 1024 / 1440 px). Lighthouse perf budget: hero LCP < 2.0 s, CLS < 0.05.
@@ -288,7 +286,7 @@ These are off-limits during implementation. If a future change benefits any of t
 ## Open questions for Allen
 
 1. **GSAP InertiaPlugin** — DotGrid's elastic shock animation depends on GSAP's premium InertiaPlugin (Club GreenSock subscription). Do you want to (a) buy the license, (b) drop the inertia and use a vanilla bezier ease, or (c) skip DotGrid entirely and rely on Aurora alone for atmosphere?
-2. **DotGrid scope** — KeeperHub stripe only, or also behind the 3-up tile section? The latter doubles the visual interest but stacks two dotted-grid backdrops on the same scroll. Recommend KeeperHub-only for v1.
+2. **DotGrid scope** — 3-up tile section only? Recommend keeping it scoped to one section to avoid stacking dotted-grid backdrops on the same scroll.
 3. **SpotlightCard on `<ToolGrid />`** — apply spotlight hover to the 6 tool cards too, or keep it limited to the 3-up tiles for a hierarchy difference? Recommend cascading to ToolGrid since they share `.tlx-card` already.
 4. **Mobile Aurora behavior** — keep at 60% opacity (still animated), drop to a static PNG fallback, or remove entirely below 720 px? The `prefers-reduced-motion` fallback is already a static PNG, so the same asset can serve double duty.
 5. **Animation taste-check** — does "section H2 reveals word-by-word on scroll" (SplitText) feel right for a self-hosted dev tool, or is even that too much motion? A more conservative alternative is a single-pass fade-in (BlurText) on H2s only, or skip section-title animation entirely and rely on Aurora + DotGrid for motion.

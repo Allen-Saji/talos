@@ -28,7 +28,7 @@ Telegram has a strict edit-rate limit (~1/sec per chat). The adapter coalesces t
 
 🤖 ↳ uniswap_get_quote ✓ ~2.59 USDC
 🤖 ↳ uniswap_swap_exact_in
-🤖   ↳ keeperhub: workflow wf_8a3c... → tx 0x17643319... → confirmed
+🤖   ↳ tx 0x17643319... → confirmed
 🤖 ✓ Swapped. tx https://sepolia.etherscan.io/tx/0x17643319...
 ```
 

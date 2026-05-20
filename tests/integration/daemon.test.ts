@@ -617,13 +617,13 @@ describe('formatDiagnostics', () => {
   it('aligns name column and prefixes pass/fail', () => {
     const out = formatDiagnostics([
       { name: 'db', pass: true, detail: 'ok' },
-      { name: 'keeperhub', pass: false, detail: 'no session' },
+      { name: 'daemon', pass: false, detail: 'unreachable' },
     ])
     const lines = out.split('\n')
     expect(lines[0]?.startsWith('PASS')).toBe(true)
     expect(lines[1]?.startsWith('FAIL')).toBe(true)
-    // name column padded to longest name (9 chars: 'keeperhub')
-    expect(lines[0]).toContain('db       ')
+    // name column padded to longest name (6 chars: 'daemon')
+    expect(lines[0]).toContain('db    ')
   })
 })
 

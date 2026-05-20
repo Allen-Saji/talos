@@ -79,9 +79,6 @@ describe('demo-flow eval — F12.16', () => {
       embeddings: deterministicEmbeddings(),
       agents: withRegistry(),
       toolSources: [fixtureSource],
-      // No tool middleware — eval focuses on the demo path itself, not
-      // KeeperHub audit. `tool_calls` rows therefore stay empty (single-
-      // writer rule), but `steps` + `runs` are still written.
     })
 
     const run = await runtime.run({

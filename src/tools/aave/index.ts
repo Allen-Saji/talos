@@ -1,10 +1,6 @@
 export { type AccountDataResult, buildAccountTool } from './account'
-export {
-  type AaveApproveResult,
-  buildAaveApproveRoute,
-  buildAaveApproveTool,
-} from './approve'
-export { type BorrowResult, buildBorrowRoute, buildBorrowTool } from './borrow'
+export { type AaveApproveResult, buildAaveApproveTool } from './approve'
+export { type BorrowResult, buildBorrowTool } from './borrow'
 export {
   BASE_CURRENCY_DECIMALS,
   ERC20_ABI,
@@ -15,12 +11,12 @@ export {
   REFERRAL_CODE,
   SEPOLIA_AAVE,
 } from './contracts'
-export { buildRepayRoute, buildRepayTool, type RepayResult } from './repay'
+export { buildRepayTool, type RepayResult } from './repay'
 export { createAaveToolSource } from './source'
-export { buildSupplyRoute, buildSupplyTool, type SupplyResult } from './supply'
+export { buildSupplyTool, type SupplyResult } from './supply'
 export {
   type AaveSepoliaToken,
   resolveAaveToken,
   SEPOLIA_AAVE_TOKENS,
 } from './tokens'
-export { buildWithdrawRoute, buildWithdrawTool, type WithdrawResult } from './withdraw'
+export { buildWithdrawTool, type WithdrawResult } from './withdraw'

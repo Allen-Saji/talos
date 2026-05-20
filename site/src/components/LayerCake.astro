@@ -5,7 +5,7 @@
 <figure class="tlx-cake">
   <svg viewBox="0 0 920 580" role="img" aria-labelledby="cake-title cake-desc" preserveAspectRatio="xMidYMin meet">
     <title id="cake-title">Talos architecture</title>
-    <desc id="cake-desc">Three thin clients (CLI, Telegram, MCP hosts) connect to a single talosd daemon. The daemon contains channel adapters, the Vercel AI SDK runtime, KeeperHub middleware, PGLite persistence, a viem wallet, and a hot pool of MCP tool servers.</desc>
+    <desc id="cake-desc">Three thin clients (CLI, Telegram, MCP hosts) connect to a single talosd daemon. The daemon contains channel adapters, the Vercel AI SDK runtime, PGLite persistence, a viem wallet, and a hot pool of MCP tool servers.</desc>
 
     <defs>
       <linearGradient id="bandRuntime" x1="0" x2="0" y1="0" y2="1">
@@ -70,10 +70,10 @@
     <text x="220" y="268" class="cake-band-detail">Provider router · Agent registry · Memory mgr · Prompt builder</text>
     <text x="220" y="288" class="cake-band-detail">three-tier memory: hot 20 / warm summary / cold semantic recall ≥ 0.78</text>
 
-    <!-- KH middleware band -->
+    <!-- Tool execution band -->
     <rect x="60" y="312" width="800" height="44" rx="6" fill="url(#bandKH)" stroke="#3a2710"/>
-    <text x="76" y="338" class="cake-band-label" fill="#d4925a">KeeperHub middleware</text>
-    <text x="280" y="338" class="cake-band-detail">audit-by-default · annotation-driven routing · KNOWN_READONLY bypass</text>
+    <text x="76" y="338" class="cake-band-label" fill="#d4925a">Tool execution</text>
+    <text x="220" y="338" class="cake-band-detail">native: viem writeContract / sendTransaction · MCP-as-source: passthrough</text>
 
     <!-- Persistence band -->
     <rect x="60" y="368" width="394" height="68" rx="6" fill="url(#bandPersist)" stroke="#25252f"/>

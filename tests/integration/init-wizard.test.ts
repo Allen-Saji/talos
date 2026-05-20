@@ -20,7 +20,6 @@ function pathsFor(configDir: string): typeof Paths {
     pidPath: path.join(configDir, 'daemon.pid'),
     channelsConfigPath: path.join(configDir, 'channels.yaml'),
     logPath: path.join(configDir, 'talos.log'),
-    keeperhubTokenPath: path.join(configDir, 'keeperhub.token'),
     burnerWalletPath: path.join(configDir, 'burner.json'),
   } as const
 }
@@ -30,7 +29,7 @@ function pathsFor(configDir: string): typeof Paths {
  * stand-in for the migrations step (PGLite contention is too costly to spin
  * up per test, plus migrations are exercised separately).
  */
-describe('runWizard (interactive, fresh install with --skip-keeperhub)', () => {
+describe('runWizard (interactive, fresh install)', () => {
   let dir: string
   let paths: typeof Paths
 
@@ -65,7 +64,6 @@ describe('runWizard (interactive, fresh install with --skip-keeperhub)', () => {
     const printed: string[] = []
     const result = await runWizard({
       mode: 'interactive',
-      skipKeeperhub: true,
       skipService: true,
       paths,
       prompter,
@@ -78,13 +76,10 @@ describe('runWizard (interactive, fresh install with --skip-keeperhub)', () => {
     expect(fs.existsSync(paths.burnerWalletPath)).toBe(true)
     expect(fs.existsSync(paths.tokenPath)).toBe(true)
     expect(fs.existsSync(paths.channelsConfigPath)).toBe(true)
-    // KH skipped -> no token file written.
-    expect(fs.existsSync(paths.keeperhubTokenPath)).toBe(false)
 
     // Per-step results recorded.
     expect(result.context.results['openai-key']?.status).toBe('done')
     expect(result.context.results.wallet?.status).toBe('done')
-    expect(result.context.results['keeperhub-oauth']?.status).toBe('skipped')
     expect(result.context.results.channels?.status).toBe('done')
     expect(result.context.results['daemon-token']?.status).toBe('done')
     expect(result.context.results.migrations?.status).toBe('done')
@@ -96,7 +91,7 @@ describe('runWizard (interactive, fresh install with --skip-keeperhub)', () => {
     expect(out).toContain('talos repl')
   })
 
-  it('non-interactive reads OPENAI_API_KEY from env and skips KH/service', async () => {
+  it('non-interactive reads OPENAI_API_KEY from env and skips service', async () => {
     process.env.OPENAI_API_KEY = 'sk-non-interactive'
     try {
       const result = await runWizard({
@@ -109,7 +104,6 @@ describe('runWizard (interactive, fresh install with --skip-keeperhub)', () => {
       expect(fs.readFileSync(path.join(dir, '.env'), 'utf8')).toContain(
         'OPENAI_API_KEY=sk-non-interactive',
       )
-      expect(result.context.results['keeperhub-oauth']?.status).toBe('skipped')
       expect(result.context.results.service?.status).toBe('skipped')
     } finally {
       delete process.env.OPENAI_API_KEY
@@ -131,7 +125,6 @@ describe('runWizard (interactive, fresh install with --skip-keeperhub)', () => {
 
     const result = await runWizard({
       mode: 'interactive',
-      skipKeeperhub: true,
       skipService: true,
       paths,
       prompter: {

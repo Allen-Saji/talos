@@ -135,8 +135,8 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
           <div class="tlx-card-icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 4.5-3.5 8-8 9-4.5-1-8-4.5-8-9V7l8-4z"/></svg>
           </div>
-          <h3 class="tlx-card-title">Audit-by-default</h3>
-          <p class="tlx-card-body">Every chain-mutating tool routes through KeeperHub workflows. A read-only allowlist bypasses the audit hop. Tools that don't declare themselves are routed.</p>
+          <h3 class="tlx-card-title">Local signer</h3>
+          <p class="tlx-card-body">Mutating tools sign locally via viem from a 0600-mode burner. No third-party signer in the path; the wallet never leaves the box.</p>
         </article>
       </div>
     </div>
@@ -160,7 +160,7 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
       <p class="tlx-section-sub">One process owns the database, the runtime, the MCP host, and the wallet. Everything else is a thin client over WebSocket.</p>
       <LayerCake />
       <p style="margin: 1.25rem 0 0; color: var(--tlx-fg-muted); font-size: 0.92rem;">
-        Read the full design — schemas, event taxonomy, retrieval strategy, daemon lifecycle, audit-by-default contract — in <a href="/docs/architecture/layer-cake" style="color:var(--tlx-bronze-bright);">the architecture docs</a>.
+        Read the full design — schemas, event taxonomy, retrieval strategy, daemon lifecycle — in <a href="/docs/architecture/layer-cake" style="color:var(--tlx-bronze-bright);">the architecture docs</a>.
       </p>
     </div>
   </section>
@@ -185,27 +185,6 @@ const canonical = new URL(Astro.url.pathname, SITE).toString();
     </div>
   </section>
 
-  <!-- KH stripe -->
-  <section class="tlx-section tlx-section--weight" id="keeperhub">
-    <div class="tlx-container">
-      <div class="tlx-stripe tlx-stripe--dotgrid">
-        <div class="tlx-dotgrid-bg" aria-hidden="true">
-          <DotGrid client:visible dotSize={2} gap={28} baseColor="#25252f" activeColor="#b87333" proximity={120} shockRadius={180} shockStrength={4} returnDuration={1200} />
-        </div>
-        <div class="tlx-stripe-content">
-          <div class="tlx-stripe-text">
-            <span class="tlx-pill">KeeperHub</span>
-            <p style="margin: 0.7rem 0 0;"><strong>Audit-by-default execution.</strong></p>
-            <small>Every mutating tool call routes through a KeeperHub workflow. Receipts written to the local DB. Read-only calls bypass the hop. Talos is the reference "OpenClaw connector" for the KeeperHub track at ETHGlobal Open Agents.</small>
-          </div>
-          <div style="display:flex; gap:0.6rem;">
-            <a class="tlx-btn" href="https://keeperhub.com">KeeperHub →</a>
-            <a class="tlx-btn tlx-btn--primary" href="/docs/architecture/keeperhub">How it works</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <Footer />
 

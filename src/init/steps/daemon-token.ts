@@ -16,10 +16,7 @@ export type DaemonTokenDeps = {
 export function runDaemonTokenStep(ctx: WizardContext, deps: DaemonTokenDeps = {}): StepResult {
   const tokenPath = ctx.paths.tokenPath
 
-  if (
-    ctx.idempotency === 'partial-oauth-only' ||
-    (ctx.idempotency === 'keep' && ctx.existing.daemonToken)
-  ) {
+  if (ctx.idempotency === 'keep' && ctx.existing.daemonToken) {
     return { status: 'kept', summary: `Daemon token kept (${tokenPath})` }
   }
 

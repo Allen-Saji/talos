@@ -10,7 +10,6 @@ import {
   type DbHandle,
   insertMessageEmbedding,
   openRun,
-  recordToolCall,
   runMigrations,
   searchMessages,
   upsertThread,
@@ -56,14 +55,14 @@ describe('persistence — migrations + schema', () => {
         'threads',
         'runs',
         'steps',
-        'tool_calls',
         'message_embeddings',
         'knowledge_chunks',
       ]),
     )
+    expect(names).not.toContain('tool_calls')
   })
 
-  it('writes thread → run → step → tool_call respecting FKs', async () => {
+  it('writes thread → run → step respecting FKs', async () => {
     const thread = await upsertThread(handle.db, {
       id: 'cli:test:default',
       channel: 'cli',
@@ -84,15 +83,6 @@ describe('persistence — migrations + schema', () => {
       content: 'invoking aave_supply',
     })
     expect(step.runId).toBe(run.id)
-
-    const tc = await recordToolCall(handle.db, {
-      runId: run.id,
-      stepId: step.id,
-      toolCallId: 'call_1',
-      toolName: 'aave_supply',
-      args: { amount: '100', asset: 'USDC', chain: 'arbitrum' },
-    })
-    expect(tc.toolName).toBe('aave_supply')
 
     await closeRun(handle.db, run.id, { status: 'completed', summary: 'done' })
 

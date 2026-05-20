@@ -10,19 +10,11 @@ import {
 import { loadEnv, resetEnvCache } from '@/config/env'
 import { paths } from '@/config/paths'
 import { ensureToken } from '@/config/token'
-import {
-  type AnnotationLookup,
-  createKeeperHubClient,
-  createKeeperHubMiddleware,
-  type KeeperHubClient,
-  type MutateRoute,
-  type ToolMiddleware,
-} from '@/keeperhub'
 import { runKnowledgeCron } from '@/knowledge/cron'
 import { createKnowledgeRetriever } from '@/knowledge/retrieve'
 import { type SchedulerHandle, startScheduler } from '@/knowledge/scheduler'
 import { defaultKnowledgeSources } from '@/knowledge/sources'
-import { defaultMcpServers, McpHost, McpToolSource, type ToolAnnotations } from '@/mcp-host'
+import { defaultMcpServers, McpHost, McpToolSource } from '@/mcp-host'
 import {
   assertNoLiveDaemon,
   createDb,
@@ -35,7 +27,6 @@ import { AgentRegistry, TALOS_ETH_AGENT } from '@/runtime/agents'
 import { createOpenAIEmbeddings } from '@/runtime/embeddings'
 import { createProviderRouter } from '@/runtime/providers'
 import { createRuntime } from '@/runtime/runtime'
-import type { RunContext } from '@/runtime/types'
 import { logger } from '@/shared/logger'
 import { createAaveToolSource } from '@/tools/aave'
 import { createAgentKitToolSource } from '@/tools/agentkit'
@@ -47,8 +38,7 @@ import { type ControlPlane, createControlPlane } from './server'
 
 /**
  * Build the list of in-process (Talos-owned) tool sources Talos boots with.
- * Each source contributes pre-namespaced tools and self-declared
- * annotations consulted by the KeeperHub middleware.
+ * Each source contributes pre-namespaced tools.
  *
  * Uniswap needs the wallet + a Sepolia RPC. AgentKit init is async (it awaits
  * action-provider registration); other sources construct synchronously.
@@ -149,81 +139,14 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
   }
 
   // In-process (native) tool sources contribute Talos-owned tools (Li.Fi,
-  // AgentKit cherry-pick, Uniswap V3 on Sepolia, future custom Aave). Share
-  // the runtime's tool surface with the MCP host and provide their own
-  // annotations to the KeeperHub middleware. No spawn cost, no serialization
-  // round-trip.
+  // AgentKit cherry-pick, Uniswap V3 on Sepolia, custom Aave). Tools execute
+  // directly via viem — no MCP spawn cost, no serialization round-trip.
   const nativeSources: NativeToolSource[] = await defaultNativeToolSources({
     RPC_URL_SEPOLIA: env.RPC_URL_SEPOLIA,
   })
   for (const src of nativeSources) {
     logger.info({ source: src.name, tools: src.toolNames().length }, 'native tool source ready')
   }
-
-  // Annotation lookup feeds the KeeperHub `shouldAudit` policy. Native sources
-  // declare their own annotations; the MCP host carries parsed + override-merged
-  // annotations on its tool index. Native takes priority on collision (matches
-  // `mergeToolSources` ordering).
-  const annotationLookup: AnnotationLookup = (name) => {
-    for (const src of nativeSources) {
-      const a = src.annotations(name)
-      if (a) return a
-    }
-    if (mcpHost) {
-      const entry = mcpHost.listTools().find((t) => t.namespacedName === name)
-      if (entry) return entry.annotations as ToolAnnotations
-    }
-    return undefined
-  }
-
-  // Aggregate KeeperHub mutate routes from every native source. Mutate tools
-  // in MCP-hosted servers don't yet declare routes — when they do, the host
-  // can expose a similar `routes()` getter and we union here.
-  const routes = new Map<string, MutateRoute>()
-  for (const src of nativeSources) {
-    for (const [name, route] of Object.entries(src.routes())) {
-      routes.set(name, route)
-    }
-  }
-  if (routes.size > 0) {
-    logger.info({ count: routes.size, names: [...routes.keys()] }, 'mutate routes registered')
-  }
-
-  // KeeperHub client is opt-in: built only when a session token exists on
-  // disk (operator ran `talos init` and completed OAuth). When absent, mutate
-  // tools fall through to direct execute and audit rows still record the
-  // call. We retain the warning so demo runs notice the missing wiring.
-  let khClient: KeeperHubClient | undefined
-  try {
-    khClient = await createKeeperHubClient({ tokenPath: paths.keeperhubTokenPath })
-  } catch (err) {
-    logger.info(
-      { err: err instanceof Error ? err.message : String(err) },
-      'keeperhub session not configured — mutate routing disabled (run `talos init` to enable)',
-    )
-  }
-
-  // Operators can force mutate routing off (KEEPERHUB_DISABLE_MUTATES=true) to
-  // bypass an unhealthy upstream while keeping audit logging intact. Mutate
-  // tools fall through to direct viem execute; audit rows still get written.
-  const khMutatesDisabled = env.KEEPERHUB_DISABLE_MUTATES
-  if (khMutatesDisabled && khClient) {
-    logger.info(
-      'KEEPERHUB_DISABLE_MUTATES=true — mutate tools will execute directly via viem (audit logging still active)',
-    )
-  }
-  const khForMiddleware = khMutatesDisabled ? undefined : khClient
-
-  // Per-run middleware factory. Bound at boot to db + annotation lookup +
-  // optional KH client/routes; the runtime calls it per run with the runId so
-  // audit rows carry the right run context. Single writer for `tool_calls`.
-  const toolMiddleware = (ctx: RunContext): ToolMiddleware =>
-    createKeeperHubMiddleware({
-      db: dbHandle.db,
-      runContext: () => ctx,
-      annotations: annotationLookup,
-      ...(khForMiddleware ? { kh: { client: khForMiddleware, routes } } : {}),
-    })
 
   // Build runtime deps. Summarizer / fact pipeline still deferred (#16/#17).
   const agents = new AgentRegistry()
@@ -248,7 +171,6 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
     embeddings,
     agents,
     toolSources: [...(mcpHost ? [new McpToolSource(mcpHost)] : []), ...nativeSources],
-    toolMiddleware,
     knowledgeRetriever,
   })
 
@@ -358,13 +280,6 @@ export async function startDaemon(startOpts: StartDaemonOpts = {}): Promise<Daem
           await mcpHost.stop()
         } catch (err) {
           logger.warn({ err }, 'error stopping mcp host')
-        }
-      }
-      if (khClient) {
-        try {
-          await khClient.close()
-        } catch (err) {
-          logger.warn({ err }, 'error closing keeperhub client')
         }
       }
       try {

@@ -18,11 +18,11 @@ export interface McpServerConfig {
   /** Extra headers for HTTP transport (e.g. `Authorization: Bearer ...`). */
   headers?: Record<string, string>
   /**
-   * Per-tool annotation overrides applied at registration time. Lets us correct
-   * audit-routing for third-party servers that don't ship MCP-level annotations
-   * (e.g. mark `resolve_ens_name` as `readOnly: true` so the KeeperHub
-   * middleware bypasses workflow audit). Keyed by the tool's *original* name
-   * (pre-namespacing). Merged shallow over the parsed annotations.
+   * Per-tool annotation overrides applied at registration time. Lets us
+   * correct annotations for third-party servers that don't ship MCP-level
+   * metadata (e.g. mark `resolve_ens_name` as `readOnly: true`). Keyed by the
+   * tool's *original* name (pre-namespacing). Merged shallow over the parsed
+   * annotations.
    */
   staticAnnotations?: Record<string, Partial<ToolAnnotations>>
 }

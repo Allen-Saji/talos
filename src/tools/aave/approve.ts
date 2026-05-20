@@ -8,7 +8,6 @@ import {
   type WalletClient,
 } from 'viem'
 import { z } from 'zod'
-import type { MutateRoute } from '@/keeperhub'
 import { ERC20_ABI, SEPOLIA_AAVE } from './contracts'
 import { resolveAaveToken } from './tokens'
 
@@ -33,9 +32,8 @@ export type AaveApproveResult = {
  * - `aave_supply` (Pool pulls the underlying)
  * - `aave_repay` (Pool pulls the underlying being repaid)
  *
- * Mirrors `uniswap_approve_router`: direct viem `sendTransaction` when
- * unrouted, KeeperHub-routed via the `MutateRoute` below otherwise. Account
- * is bound from the wallet client so viem signs locally.
+ * Mirrors `uniswap_approve_router`: direct viem `sendTransaction`; account is
+ * bound from the wallet client so viem signs locally.
  */
 export function buildAaveApproveTool(opts: {
   walletClient: WalletClient
@@ -44,7 +42,7 @@ export function buildAaveApproveTool(opts: {
 }) {
   return tool({
     description:
-      'Approve the Aave V3 Pool (Sepolia) to spend a token from the wallet. Required before aave_supply (the Pool pulls the underlying) and aave_repay. Mutates state; routed through KeeperHub when configured.',
+      'Approve the Aave V3 Pool (Sepolia) to spend a token from the wallet. Required before aave_supply (the Pool pulls the underlying) and aave_repay.',
     inputSchema: ApproveSchema,
     execute: async (args): Promise<AaveApproveResult> => {
       const token = resolveAaveToken(args.token)
@@ -72,21 +70,4 @@ export function buildAaveApproveTool(opts: {
       }
     },
   })
-}
-
-/**
- * KeeperHub mutate route for `aave_approve_pool`. Encodes a single
- * `ERC20.approve(Pool, amount)` call.
- */
-export const buildAaveApproveRoute = (): MutateRoute => (args) => {
-  const parsed = ApproveSchema.parse(args)
-  const token = resolveAaveToken(parsed.token)
-  const amountRaw = parseUnits(parsed.amount, token.decimals)
-  return {
-    network: 'sepolia',
-    contract_address: token.address,
-    function_name: 'approve',
-    function_args: [SEPOLIA_AAVE.pool, amountRaw.toString()],
-    abi: ERC20_ABI,
-  }
 }

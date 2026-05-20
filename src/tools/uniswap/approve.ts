@@ -8,7 +8,6 @@ import {
   type WalletClient,
 } from 'viem'
 import { z } from 'zod'
-import type { MutateRoute } from '@/keeperhub'
 import { ERC20_ABI, SEPOLIA_UNISWAP } from './contracts'
 import { resolveToken } from './tokens'
 
@@ -27,13 +26,8 @@ export type ApproveResult = {
 
 /**
  * Build the `uniswap_approve_router` tool. Approves SwapRouter02 to spend
- * `amount` of `token` from the wallet. Two roles:
- *
- * 1. **Direct execute** (no KH route configured) — sends an `approve` tx
- *    via the wallet client and returns the tx hash.
- * 2. **KeeperHub-routed** (production) — middleware swaps in the
- *    `MutateRoute` below and KH executes the approve, returning workflow
- *    metadata. Audit row records the route.
+ * `amount` of `token` from the wallet by sending an `approve` tx via the
+ * wallet client and returning the tx hash.
  */
 export function buildApproveTool(opts: {
   walletClient: WalletClient
@@ -42,7 +36,7 @@ export function buildApproveTool(opts: {
 }) {
   return tool({
     description:
-      'Approve the Uniswap V3 SwapRouter02 to spend a token from the wallet. Required before swap_exact_in. Mutates state; routed through KeeperHub workflow when configured.',
+      'Approve the Uniswap V3 SwapRouter02 to spend a token from the wallet. Required before swap_exact_in.',
     inputSchema: ApproveSchema,
     execute: async (args): Promise<ApproveResult> => {
       const token = resolveToken(args.token)
@@ -75,21 +69,4 @@ export function buildApproveTool(opts: {
       }
     },
   })
-}
-
-/**
- * KeeperHub mutate route for `uniswap_approve_router`. Maps tool args to a
- * single `ERC20.approve(spender, amount)` contract call.
- */
-export const buildApproveRoute = (): MutateRoute => (args) => {
-  const parsed = ApproveSchema.parse(args)
-  const token = resolveToken(parsed.token)
-  const amountRaw = parseUnits(parsed.amount, token.decimals)
-  return {
-    network: 'sepolia',
-    contract_address: token.address,
-    function_name: 'approve',
-    function_args: [SEPOLIA_UNISWAP.swapRouter02, amountRaw.toString()],
-    abi: ERC20_ABI,
-  }
 }

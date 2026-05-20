@@ -20,7 +20,7 @@ import { getAgentKit } from './client'
  *
  * Annotation classification: AgentKit doesn't expose a write/read flag, so we
  * pattern-match the normalized name with `READ_PATTERNS`. Misses default to
- * `mutates: true` (audit-by-default — consistent with KeeperHub middleware).
+ * `mutates: true` so downstream surfaces treat them as state-changing.
  */
 
 /**

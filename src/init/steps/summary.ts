@@ -18,7 +18,6 @@ export function runSummaryStep(ctx: WizardContext, deps: SummaryStepDeps = {}): 
   for (const step of [
     'openai-key',
     'wallet',
-    'keeperhub-oauth',
     'channels',
     'daemon-token',
     'migrations',

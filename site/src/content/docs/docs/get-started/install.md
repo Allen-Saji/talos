@@ -59,4 +59,4 @@ talos --version
 
 ## Next
 
-[Run `talos init`](/docs/get-started/init) to bootstrap config, the burner wallet, and KeeperHub OAuth.
+[Run `talos init`](/docs/get-started/init) to bootstrap config and the burner wallet.

@@ -27,20 +27,17 @@
 
 Talos is an opinionated agent for working with Ethereum. It runs locally as an always-on daemon (`talosd`) with thin clients on top — a CLI REPL, a Telegram bot, and an MCP server you can drop into Claude Desktop, Cursor, or OpenClaw. The daemon owns a single PGLite database, a hot pool of curated DeFi MCP servers, a nightly knowledge cron over the ETH ecosystem, and a wallet that never leaves your machine.
 
-It is **vertical** by design. General-purpose agents will cheerfully invent contract addresses and miss the difference between Aave and Uniswap. Talos ships with first-party tools for Aave V3, Uniswap V3, Li.Fi, Blockscout, the Coinbase AgentKit, and a generic EVM MCP — all wired through a single tool-routing surface that the agent loop sees as one bundle.
-
-Every chain-mutating call is routed through [KeeperHub](https://keeperhub.com) for an auditable execution trail. Read-only calls bypass the audit hop. The default is **audit-by-default**: a tool that doesn't explicitly declare itself read-only is treated as if it mutates state.
+It is **vertical** by design. General-purpose agents will cheerfully invent contract addresses and miss the difference between Aave and Uniswap. Talos ships with first-party tools for Aave V3, Uniswap V3, Li.Fi, Blockscout, the Coinbase AgentKit, and a generic EVM MCP — all wired through a single tool-routing surface that the agent loop sees as one bundle. Transactions sign locally via viem; nothing leaves the box.
 
 ## Why Talos?
 
 | Problem | What Talos does |
 |---|---|
-| General agents are shallow on DeFi specifics | Curated, namespaced tools per protocol with annotation-driven routing |
+| General agents are shallow on DeFi specifics | Curated, namespaced tools per protocol |
 | Stateless agents forget across sessions | Three-tier memory: hot (last 20 runs) + warm (thread summary) + cold (cross-thread semantic recall) |
 | Hosted agents take custody of your wallet | Local viem signer, mode-0600 storage, BYOK model keys |
 | One-shot LLM tools are slow to spin up | Always-running daemon — CLI invocations hit a hot runtime in <100ms |
 | Plain prompts go stale | Nightly knowledge cron over L2Beat, DefiLlama, Etherscan, protocol changelogs |
-| Audit trails are an afterthought | Every mutating tool call routed through KeeperHub workflows by default |
 
 ## Features
 
@@ -69,9 +66,8 @@ Every chain-mutating call is routed through [KeeperHub](https://keeperhub.com) f
 - MCP server (`talos serve --mcp`) — drop into Claude Desktop, Cursor, OpenClaw, Hermes
 - All channels share one wallet, one knowledge base, one memory store
 
-**Execution and audit**
-- KeeperHub middleware with audit-by-default and a `KNOWN_READONLY` regex bypass
-- OAuth 2.1 + Dynamic Client Registration + PKCE — no manual API keys
+**Execution**
+- Tools execute directly via viem from a local burner wallet — no third-party signer in the path
 - Live progress streaming: every step yields a typed event to the caller
 
 **Operations**
@@ -81,9 +77,9 @@ Every chain-mutating call is routed through [KeeperHub](https://keeperhub.com) f
 
 ## Architecture
 
-![Talos layer cake — thin clients, talosd (channel adapters / runtime / KeeperHub middleware), PGLite + Drizzle, wallet + knowledge cron, hot MCP tool servers](assets/talos-arch.png)
+![Talos layer cake — thin clients, talosd (channel adapters / runtime), PGLite + Drizzle, wallet + knowledge cron, hot MCP tool servers](assets/talos-arch.png)
 
-See [`docs/architecture.md`](docs/architecture.md) for the full design — schemas, event taxonomy, retrieval strategy, daemon lifecycle, and the audit-by-default contract.
+See [`docs/architecture.md`](docs/architecture.md) for the full design — schemas, event taxonomy, retrieval strategy, and daemon lifecycle.
 
 ## Quick start
 
@@ -113,13 +109,12 @@ The interactive wizard walks you through:
 
 1. OpenAI API key (written to `.env`, mode 0600)
 2. Burner wallet generation (viem mnemonic, exported as private key)
-3. KeeperHub OAuth (browser handoff via RFC 8252 loopback redirect)
-4. Channel configuration (`channels.yaml`)
-5. Daemon bearer token
-6. Database migrations
-7. Optional service install (launchd / systemd)
+3. Channel configuration (`channels.yaml`)
+4. Daemon bearer token
+5. Database migrations
+6. Optional service install (launchd / systemd)
 
-Re-running `init` is idempotent — it detects existing config and prompts to keep, reset, or partial-reset (re-do OAuth only). Pass `--non-interactive` for CI, `--skip-keeperhub` to defer the OAuth handoff.
+Re-running `init` is idempotent — it detects existing config and prompts to keep or reset. Pass `--non-interactive` for CI.
 
 ### Run
 
@@ -149,11 +144,11 @@ You: swap 0.001 ETH for USDC on uniswap, then supply 2 USDC to aave
 ↳ calling uniswap_get_quote { tokenIn: "ETH", tokenOut: "USDC", amountIn: "0.001" }
    ✓ ~2.59 USDC at 0.3% fee
 ↳ calling uniswap_swap_exact_in { ... }
-   ↳ keeperhub: workflow wf_8a3c... → tx 0x17643319... → confirmed
+   ✓ tx 0x17643319... → confirmed
 ↳ calling aave_approve_pool { token: "USDC", amount: "2" }
-   ↳ keeperhub: workflow wf_5d2e... → tx 0x4b9a... → confirmed
+   ✓ tx 0x4b9a... → confirmed
 ↳ calling aave_supply { token: "USDC", amount: "2" }
-   ↳ keeperhub: workflow wf_b71f... → tx 0x9c2d... → confirmed
+   ✓ tx 0x9c2d... → confirmed
 
 Done. Swapped 0.001 ETH for 2.59 USDC and supplied 2 USDC to Aave.
 You now have an aUSDC position earning variable yield.
@@ -211,16 +206,16 @@ One thread per host session, so calls within a session share continuity. Cross-t
 
 ## Tool catalogue
 
-| Source | Tools | Mode | Routed via KH? |
-|---|---|---|---|
-| Aave V3 (Sepolia) | `aave_get_user_account_data`, `aave_approve_pool`, `aave_supply`, `aave_borrow`, `aave_repay`, `aave_withdraw` | native | mutates only |
-| Uniswap V3 (Sepolia) | `uniswap_get_quote`, `uniswap_approve_router`, `uniswap_swap_exact_in` | native | mutates only |
-| Li.Fi | `lifi_get_chains`, `lifi_get_connections`, `lifi_get_quote`, `lifi_get_status`, `lifi_execute_quote` | native | mutates only |
-| AgentKit | wallet primitives + Pyth, Compound, Morpho, and more (Coinbase action providers) | MCP-as-source | annotation-driven |
-| Blockscout | multi-chain block, contract, tx reads | hosted MCP (Streamable HTTP) | read-only allowlist |
-| `mcpdotdirect/evm-mcp` | generic EVM RPC, ENS, ERC-20/721 | local MCP | annotation overrides |
+| Source | Tools | Mode |
+|---|---|---|
+| Aave V3 (Sepolia) | `aave_get_user_account_data`, `aave_approve_pool`, `aave_supply`, `aave_borrow`, `aave_repay`, `aave_withdraw` | native |
+| Uniswap V3 (Sepolia) | `uniswap_get_quote`, `uniswap_approve_router`, `uniswap_swap_exact_in` | native |
+| Li.Fi | `lifi_get_chains`, `lifi_get_connections`, `lifi_get_quote`, `lifi_get_status`, `lifi_execute_quote` | native |
+| AgentKit | wallet primitives + Pyth, Compound, Morpho, and more (Coinbase action providers) | MCP-as-source |
+| Blockscout | multi-chain block, contract, tx reads | hosted MCP (Streamable HTTP) |
+| `mcpdotdirect/evm-mcp` | generic EVM RPC, ENS, ERC-20/721 | local MCP |
 
-Adding a tool is an exercise in copying any of the `src/tools/<name>/` folders — five small files (`contracts.ts`, `tokens.ts`, the action files, `source.ts`, `index.ts`) and a `MutateRoute` per mutating tool.
+Adding a tool is an exercise in copying any of the `src/tools/<name>/` folders — `contracts.ts`, `tokens.ts`, the action files, `source.ts`, `index.ts`. Mutating tools call viem directly from the action file's `execute`.
 
 ## Project layout
 
@@ -229,7 +224,6 @@ src/
   runtime/         agent loop, provider router, agent registry
   persistence/     PGLite + Drizzle (threads, runs, steps, embeddings, knowledge)
   memory/          three-tier hot / warm / cold retrieval
-  keeperhub/       OAuth client + audit-by-default middleware
   mcp-host/        multi-MCP-client orchestrator with namespacing
   tools/
     aave/          custom Aave V3 source
@@ -239,7 +233,7 @@ src/
     native/        NativeToolSource base
   knowledge/       nightly cron + retrieval pipeline
   wallet/          viem signer
-  init/            `talos init` wizard (idempotent, RFC 8252 loopback OAuth)
+  init/            `talos init` wizard (idempotent)
   channels/
     cli/           WS REPL client
     telegram/      grammY bot
@@ -277,13 +271,12 @@ For the full contributor workflow, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Status
 
-Built for **[ETHGlobal Open Agents](https://ethglobal.com/events/open-agents)** (Apr 24 – May 6, 2026). Targeting the **KeeperHub** sponsor track ($5k primary, "OpenClaw connector").
+Built for **[ETHGlobal Open Agents](https://ethglobal.com/events/open-agents)** (Apr 24 – May 6, 2026).
 
 | Layer | State |
 |---|---|
 | Runtime + agent loop | shipped |
 | PGLite persistence + three-tier memory | shipped |
-| KeeperHub middleware (OAuth + audit) | shipped |
 | MCP host + namespaced tool surface | shipped |
 | Channels (CLI, Telegram, MCP server) | shipped |
 | Native tools (Aave, Uniswap V3, Li.Fi) | shipped |
@@ -291,11 +284,7 @@ Built for **[ETHGlobal Open Agents](https://ethglobal.com/events/open-agents)** 
 | Nightly knowledge cron | shipped |
 | `talos init` interactive wizard | shipped |
 | Demo-flow regression eval | shipped |
-| Live KH OAuth round-trip verification | pending |
-| Demo recording + submission writeup | pending |
 | ZeroDev account-abstraction wrap | deferred to v1.1 |
-
-424 tests passing across 35 files at the time of writing.
 
 ## License
 
@@ -308,5 +297,4 @@ Built for **[ETHGlobal Open Agents](https://ethglobal.com/events/open-agents)** 
 - [PGLite](https://pglite.dev) — Postgres-in-WASM, the reason this app fits in a single binary
 - [viem](https://viem.sh) — Ethereum client
 - [grammY](https://grammy.dev) — Telegram bot framework
-- [KeeperHub](https://keeperhub.com) — execution + audit infrastructure
 - The **ETHGlobal Open Agents** organisers and judges

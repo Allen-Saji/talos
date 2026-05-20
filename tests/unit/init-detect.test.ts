@@ -19,7 +19,6 @@ function pathsFor(configDir: string): typeof Paths {
     pidPath: path.join(configDir, 'daemon.pid'),
     channelsConfigPath: path.join(configDir, 'channels.yaml'),
     logPath: path.join(configDir, 'talos.log'),
-    keeperhubTokenPath: path.join(configDir, 'keeperhub.token'),
     burnerWalletPath: path.join(configDir, 'burner.json'),
   } as const
 }
@@ -44,7 +43,6 @@ describe('detectExisting', () => {
   it('detects each artifact independently', () => {
     fs.writeFileSync(path.join(dir, '.env'), 'OPENAI_API_KEY=sk-test\n')
     fs.writeFileSync(path.join(dir, 'burner.json'), '{}')
-    fs.writeFileSync(path.join(dir, 'keeperhub.token'), '{}')
     fs.writeFileSync(path.join(dir, 'daemon.token'), 'abc')
     fs.writeFileSync(path.join(dir, 'channels.yaml'), 'auto_start_daemon: true\n')
 
@@ -53,7 +51,6 @@ describe('detectExisting', () => {
       envFile: true,
       envHasOpenAiKey: true,
       burnerWallet: true,
-      keeperhubToken: true,
       daemonToken: true,
       channelsConfig: true,
       empty: false,

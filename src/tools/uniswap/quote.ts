@@ -40,9 +40,8 @@ export type QuoteResult = {
 }
 
 /**
- * Build the `uniswap_get_quote` tool. The leading `_get_` opts the tool out of
- * KeeperHub audit by matching the `KNOWN_READONLY` regex — quotes are pure
- * static reads against QuoterV2 + the Factory.
+ * Build the `uniswap_get_quote` tool. Pure static reads against QuoterV2 +
+ * the Factory.
  */
 export function buildQuoteTool(publicClient: PublicClient) {
   return tool({

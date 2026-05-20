@@ -32,12 +32,11 @@ Runtime design for [[spec|Talos spec]]. Locked decisions, schemas, flows.
 │   ├ Agent registry  (multi-agent ready, single v1)     │
 │   ├ Conversation mgr (threads, runs, summaries)        │
 │   ├ Prompt builder  (persona + retrieved context)      │
-│   ├ Agent loop      (streamText, hot MCP host)         │
-│   └ Middleware      (keeperhub, guardrails, audit)     │
+│   └ Agent loop      (streamText, hot MCP host)         │
 ├────────────────────────────────────────────────────────┤
 │ Persistence (PGLite, Drizzle ORM, kept open)            │
 │  ├ Knowledge: ETH ecosystem (cron-fed nightly)         │
-│  └ Conversations: threads, runs, steps, tool_calls     │
+│  └ Conversations: threads, runs, steps                 │
 ├────────────────────────────────────────────────────────┤
 │ Wallet: viem + optional ZeroDev AA                      │
 ├────────────────────────────────────────────────────────┤
@@ -58,7 +57,7 @@ Runtime design for [[spec|Talos spec]]. Locked decisions, schemas, flows.
 | 6 | Cross-thread recall | Adaptive: cosine ≥ 0.78, top-3, always-search |
 | 7 | Summarization trigger | Turn count: every 20 runs |
 | 8 | LLM call style | `streamText` everywhere (P0) |
-| 9 | KeeperHub model | Block-and-wait for tx receipt before returning |
+| 9 | Tx execution | Sign locally via viem and block-and-wait for receipt before returning |
 | 10 | Reasoning visibility | Stream every step to caller in realtime |
 | 11 | Multi-agent abstraction | First-class `Agent` type now, single agent in v1 |
 | 12 | Tool naming | `{server}_{tool}`, underscores, regex `[a-zA-Z0-9_]{1,64}` |
@@ -70,7 +69,6 @@ Runtime design for [[spec|Talos spec]]. Locked decisions, schemas, flows.
 | 18 | v1 channels | CLI (WS REPL) + Telegram (long-poll) + MCP-server (stdio→WS proxy) |
 | 19 | Telegram streaming | Edit-in-place — one message per run, progressively updated |
 | 20 | Multi-tenancy | Single-user model in v1; one wallet shared across channels; Telegram username/userId whitelist |
-| 21 | KeeperHub default annotation | **Audit-by-default** — undeclared tools route through workflows; regex allowlist (`KNOWN_READONLY`) bypasses known read-only patterns |
 | 22 | Thread keying | CLI: `cli:{$USER}:default` persistent · TG: `tg:{chatId}` persistent · MCP: `mcp:{pid}:{startedAt}` per host session · cross-thread recall bridges across all |
 | 23 | PGLite ownership | Daemon owns at runtime. One-shot commands (`init`, `migrate`, `doctor`) open the DB directly when daemon is stopped, then close. Never concurrent. |
 | 24 | Test stack | Vitest + PGLite-in-memory + seeded LLM eval; demo-flow eval is the regression gate |
@@ -151,7 +149,6 @@ export const runs = pgTable('runs', {
   finalAssistantText:  text('final_assistant_text'),
   totalTokens:         integer('total_tokens'),
   totalCostUsd:        real('total_cost_usd'),
-  workflowId:          text('workflow_id'),            // KeeperHub if any
 })
 
 export const steps = pgTable('steps', {
@@ -161,18 +158,6 @@ export const steps = pgTable('steps', {
   stepType:  text('step_type').notNull(),              // 'llm' | 'tool_call' | 'tool_result'
   content:   jsonb('content').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
-})
-
-export const toolCalls = pgTable('tool_calls', {
-  id:          text('id').primaryKey(),
-  stepId:     text('step_id').references(() => steps.id, { onDelete: 'cascade' }),
-  toolName:    text('tool_name').notNull(),            // 'aave_supply'
-  args:        jsonb('args').notNull(),
-  result:      jsonb('result'),
-  durationMs:  integer('duration_ms'),
-  error:       text('error'),
-  workflowId:  text('workflow_id'),                    // KeeperHub workflow
-  txHash:      text('tx_hash'),                        // chain tx if mutating
 })
 
 export const messageEmbeddings = pgTable('message_embeddings', {
@@ -201,7 +186,6 @@ export const knowledgeChunks = pgTable('knowledge_chunks', {
 ```sql
 CREATE INDEX threads_agent_updated  ON threads (agent_id, updated_at DESC);
 CREATE INDEX runs_thread            ON runs (thread_id, started_at DESC);
-CREATE INDEX tool_calls_name        ON tool_calls (tool_name);
 CREATE INDEX msg_emb_hnsw           ON message_embeddings USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX msg_emb_tsv            ON message_embeddings USING gin (tsv);
 CREATE INDEX know_emb_hnsw          ON knowledge_chunks   USING hnsw (embedding vector_cosine_ops);
@@ -275,12 +259,9 @@ Every layer that does work emits typed events into a per-run channel. CLI subscr
 
 | Type | Meaning | UX |
 |---|---|---|
-| `keeperhub:workflow_create` | Wrapping tx in workflow | `  ↳ keeperhub: creating workflow wf_…` |
-| `keeperhub:submitted` | Workflow accepted by executor | `  ↳ submitted, awaiting confirmation` |
-| `keeperhub:tx_broadcast` | Chain tx broadcast | `  ↳ tx 0x…` |
-| `keeperhub:tx_confirmed` | Tx mined | `  ↳ confirmed at block N, gas G` |
+| `tx_broadcast` | Chain tx broadcast | `  ↳ tx 0x…` |
+| `tx_confirmed` | Tx mined | `  ↳ confirmed at block N, gas G` |
 | `guardrails:exceeded` | Spend cap hit | `  ⚠ guardrail: per-day cap exceeded — abort?` |
-| `audit:logged` | Step persisted to DB | (silent) |
 
 ### Example: `supply 100 USDC to Aave on Arbitrum`
 
@@ -288,75 +269,39 @@ Every layer that does work emits typed events into a per-run channel. CLI subscr
 You: supply 100 USDC to Aave on Arbitrum
 ↳ thinking…
 ↳ calling aave_supply { amount: "100", asset: "USDC", chain: "arbitrum" }
-  ↳ keeperhub: creating workflow wf_a3f9c2…
-  ↳ submitted, awaiting confirmation
   ↳ tx 0x4f2e…
   ↳ confirmed at block 198342177, gas 145k
   ↳ ✓ aTokens minted, balance updated
 ↳ Supplied 100 USDC to Aave on Arbitrum. New aUSDC balance: 1,234.56.
 ```
 
-## KeeperHub middleware
+## Tool execution
 
-Tag-based interception. Tools self-declare in their MCP descriptor whether they mutate chain state:
+Tools execute directly via viem from the local burner wallet:
 
 ```ts
-// inside an MCP tool descriptor
-{
-  name: 'aave_supply',
-  description: '…',
-  inputSchema: { … },
-  annotations: { mutates: true, chain: 'eth' },   // ← Talos reads these
-}
+// inside a native tool (e.g. aave_supply)
+const txHash = await opts.walletClient.writeContract({
+  account: opts.walletClient.account ?? opts.walletAddress,
+  chain: opts.walletClient.chain ?? null,
+  address: SEPOLIA_AAVE.pool as Address,
+  abi: POOL_ABI,
+  functionName: 'supply',
+  args: [...],
+})
 ```
 
 Loop:
-1. LLM emits `tool-call` for `aave_supply`.
-2. Middleware checks descriptor: `mutates === true`.
-3. Call KeeperHub `create_workflow` with the intended call.
-4. Stream `keeperhub:workflow_create`.
-5. Call `execute_workflow`, poll executor.
-6. On `submitted` → stream event.
-7. On chain tx → stream `tx_broadcast`.
-8. On confirmation → stream `tx_confirmed`.
-9. Return tool result enriched with `workflowId`, `txHash` to LLM.
+1. LLM emits `tool-call`.
+2. AI SDK invokes the tool's `execute()`.
+3. Tool calls `walletClient.writeContract()` / `sendTransaction()` against the configured RPC.
+4. Tool returns the tx hash to the LLM.
 
-### Default is audit-by-default (safe-by-default)
+No third-party signer in the path. Mutating MCP tools (Aave, Uniswap, AgentKit's swap providers) all funnel through the same `getViemWalletClient()` helper. Hardware-wallet support is the lone open extension point.
 
-Tools without an explicit `mutates: false` annotation are routed through KeeperHub. This protects against third-party MCP servers (AgentKit, Blockscout, Li.Fi, EVM MCP) that don't know about our annotation field — silently bypassing audit on `agentkit_swap` because nobody declared it would be a load-bearing bug for the audit-trail prize.
+### Annotation metadata
 
-A regex allowlist bypasses well-known read-only patterns to avoid the round-trip cost (~200ms per workflow create):
-
-```ts
-const KNOWN_READONLY: RegExp[] = [
-  /_get_/,            // get_balance, get_position, get_block_number
-  /_quote$/,          // uniswap_quote
-  /_status$/,
-  /_balance$/,
-  /_position$/,
-  /_search/,
-  /^blockscout_/,     // Blockscout server is fully read-only
-]
-
-function shouldAudit(toolName: string, annotations?: { mutates?: boolean }): boolean {
-  if (annotations?.mutates === false) return false           // explicit opt-out
-  if (KNOWN_READONLY.some(rx => rx.test(toolName))) return false  // known-safe pattern
-  return true                                                 // default: audit
-}
-```
-
-Adding a new third-party MCP requires either declaring `mutates: false` in our wrapper or adding the tool name to the allowlist. Defaulting to "audit everything" trades a small latency cost on missed read-only tools for zero silent bypass holes.
-
-### KeeperHub auth (OAuth 2.1 + DCR)
-
-Spike confirmed: KeeperHub's MCP endpoint is gated by OAuth 2.1, fully discoverable via `.well-known/oauth-authorization-server` and `.well-known/oauth-protected-resource`.
-
-- Authorization Code flow with PKCE (S256)
-- **Dynamic Client Registration** at `/api/oauth/register` — Talos registers itself, no manual API key entry
-- Public-client mode (PKCE-only, `token_endpoint_auth_methods_supported: ['none']`) — no client secret to store
-- Scopes: `mcp:read`, `mcp:write`, `mcp:admin`
-
-`talos init` flow: hit well-known → register client → open browser to `/oauth/authorize` → loopback redirect captures code → exchange at `/api/oauth/token` → persist refresh + access token at `~/.config/talos/keeperhub.json` (0600). AI SDK v6's `@ai-sdk/mcp` ships `OAuthClientProvider` types for this.
+Tools self-declare `readOnly` / `mutates` annotations for clarity and to give downstream MCP hosts (Claude Desktop, OpenClaw, Cursor) honest metadata. The daemon does not gate on these in the call path; they are informational only.
 
 ### Tool-result flattening
 
@@ -404,7 +349,7 @@ Sub-agent has its own memory namespace and tool subset. Result flows back as a t
 | Version | Agents | Notes |
 |---|---|---|
 | v1 | `talos-eth` | All tools, all memory |
-| v1.1 | + `talos-eth-research`, `talos-eth-exec` | Read/write split, KeeperHub only on exec |
+| v1.1 | + `talos-eth-research`, `talos-eth-exec` | Read/write split, exec agent gated on tools that mutate state |
 | v2 | User-defined in `~/.config/talos/agents/*.yaml` | Custom personas, tool subsets |
 
 ## Daemon and channels
@@ -565,7 +510,6 @@ talos serve --mcp           # MCP-server proxy mode
 - Daemon binds to `127.0.0.1` only. No LAN/WAN exposure in v1.
 - Bearer token in `~/.config/talos/daemon.token` (0600). Rotated on `talos restart --rotate-token`.
 - Telegram is **in-process** with the daemon — no auth between TG adapter and runtime; the secret here is the bot token (config-managed).
-- KeeperHub OAuth tokens stored separately in `~/.config/talos/keeperhub.json` (0600). Refresh handled by daemon.
 
 ### Concurrency
 
@@ -583,7 +527,6 @@ Knowledge cron is daemon-scoped; runs on a single timer regardless of how many c
 | Daemon crashes | OS service auto-restarts (launchd/systemd). In-flight runs lost; threads stay consistent (closed `runs.finishedAt` with `error: aborted`) |
 | Channel adapter throws | Logged, adapter restarted; daemon stays up; other channels unaffected |
 | MCP server subprocess dies | Hot-restart on next call; tool list refreshed |
-| KeeperHub OAuth expires | Daemon refreshes via refresh_token transparently; surfaces error if refresh fails |
 | Provider rate-limit | Bubbles to client as `error` event; user retries |
 
 ## MCP-server export mode
@@ -593,7 +536,7 @@ Knowledge cron is daemon-scoped; runs on a single timer regardless of how many c
 | Tool | What it does |
 |---|---|
 | `query_eth_knowledge(question)` | Hybrid retrieval over knowledge_chunks. Returns chunks + citations. |
-| `eth_action(intent)` | Runs full agent loop. Streams progress to host as MCP `notifications/progress`. Returns final assistant text + workflow URL + tx hash. |
+| `eth_action(intent)` | Runs full agent loop. Streams progress to host as MCP `notifications/progress`. Returns final assistant text + tx hash(es). |
 | `eth_status()` | Wallet, chains, last-sync, enabled MCPs, current thread. |
 | `talos_new_thread()` | Resets the host's session thread. |
 
@@ -640,6 +583,5 @@ User upgrade flow is invisible: `npm i -g talos@latest` → next run, schema evo
 
 ## Open architecture questions (to revisit before code)
 
-- Do we ship a default keeperhub-bypass mode for read-only flows, or always-on KeeperHub even for queries? Latter is heavier but simpler audit story. *Lean: bypass for `mutates: false`.*
 - Embedding cache: do we re-embed user queries on every run or LRU-cache them? Most queries repeat. *Lean: in-memory LRU, 1000 entries.*
 - Thread title generation: separate cheap-model call (haiku) on first-run, or piggyback on the main run? *Lean: separate haiku call, async, doesn't block first response.*

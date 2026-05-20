@@ -22,16 +22,16 @@ description: Custom MCP source for Aave V3 on Sepolia. Supply, borrow, repay, wi
 You: deposit 10 USDC into aave
 
 ↳ calling aave_approve_pool { token: "USDC", amount: "10" }
-  ↳ keeperhub: workflow wf_5d2e... → tx 0x4b9a... → confirmed
+  ✓ tx 0x4b9a... → confirmed
 ↳ calling aave_supply { token: "USDC", amount: "10" }
-  ↳ keeperhub: workflow wf_b71f... → tx 0x9c2d... → confirmed
+  ✓ tx 0x9c2d... → confirmed
 
 Done. Supplied 10 USDC. You hold ~10 aUSDC.
 ```
 
 ## Routing
 
-Every Aave write is annotated `mutates: true`, so the [KeeperHub middleware](/docs/architecture/keeperhub) wraps each call in a workflow. Reads (`get_user_account_data`) are annotated `readonly: true` and bypass.
+Every Aave write signs locally via viem and broadcasts directly to Sepolia. Reads (`get_user_account_data`) are annotated `readOnly: true`.
 
 ## Where the code lives
 

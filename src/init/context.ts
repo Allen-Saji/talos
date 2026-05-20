@@ -10,13 +10,12 @@ import type { ExistingState } from './detect'
 
 export type WizardMode = 'interactive' | 'non-interactive'
 
-export type IdempotencyChoice = 'keep' | 'reset' | 'partial-oauth-only'
+export type IdempotencyChoice = 'keep' | 'reset'
 
 export type StepName =
   | 'welcome'
   | 'openai-key'
   | 'wallet'
-  | 'keeperhub-oauth'
   | 'channels'
   | 'daemon-token'
   | 'migrations'
@@ -34,8 +33,6 @@ export type StepResult = {
 export type WizardContext = {
   mode: WizardMode
   paths: typeof Paths
-  /** Skipping the KH OAuth step entirely (flag-driven or graceful fallback). */
-  skipKeeperhub: boolean
   /** Skipping service install (auto in non-interactive). */
   skipService: boolean
   /** Pre-init detection results — what already exists on disk. */

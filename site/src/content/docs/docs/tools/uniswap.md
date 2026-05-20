@@ -21,7 +21,7 @@ You: swap 0.001 ETH for USDC on uniswap
 ↳ calling uniswap_get_quote { tokenIn: "ETH", tokenOut: "USDC", amountIn: "0.001" }
   ✓ ~2.59 USDC at 0.3% fee
 ↳ calling uniswap_swap_exact_in { ... slippage: 0.5% }
-  ↳ keeperhub: workflow wf_8a3c... → tx 0x17643319... → confirmed
+  ✓ tx 0x17643319... → confirmed
 
 Done. Swapped 0.001 ETH for 2.59 USDC.
 ```
